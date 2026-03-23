@@ -1,22 +1,16 @@
-from os import link
-from tkinter import EXCEPTION
-
 from flask import Flask, render_template, request, redirect, url_for, session, jsonify
+from flask_mail import Mail, Message
 import pymysql
 import pymysql.cursors
 import hashlib
-from datetime import datetime
+from datetime import datetime, date, timedelta
+import os
+import random
+import string
 
 app = Flask(__name__)
-app.secret_key = 'finansmart_secret_key'
 
-import os
-
-app.config['MYSQL_HOST'] = os.environ.get('MYSQL_HOST', 'localhost')
-app.config['MYSQL_USER'] = os.environ.get('MYSQL_USER', 'root')
-app.config['MYSQL_PASSWORD'] = os.environ.get('MYSQL_PASSWORD', '')
-app.config['MYSQL_DB'] = os.environ.get('MYSQL_DB', 'finansmart')
-app.config['MYSQL_PORT'] = int(os.environ.get('MYSQL_PORT', 3306))
+app.secret_key = os.environ.get('SECRET_KEY', 'finansmart_secret_key')
 
 app.config['MAIL_SERVER'] = 'smtp.gmail.com'
 app.config['MAIL_PORT'] = 587
@@ -25,20 +19,33 @@ app.config['MAIL_USERNAME'] = os.environ.get('MAIL_USERNAME', 'rroceana@gmail.co
 app.config['MAIL_PASSWORD'] = os.environ.get('MAIL_PASSWORD', 'curmzyawtlapqcyn')
 app.config['MAIL_DEFAULT_SENDER'] = ('FinanSmart', os.environ.get('MAIL_USERNAME', 'rroceana@gmail.com'))
 
-app.secret_key = os.environ.get('SECRET_KEY', 'finansmart_secret_key')
+mail = Mail(app)
 
-mysql = MySQL(app)
+def get_db():
+    return pymysql.connect(
+        host=os.environ.get('MYSQL_HOST', 'localhost'),
+        user=os.environ.get('MYSQL_USER', 'root'),
+        password=os.environ.get('MYSQL_PASSWORD', ''),
+        database=os.environ.get('MYSQL_DB', 'finansmart'),
+        port=int(os.environ.get('MYSQL_PORT', 3306)),
+        cursorclass=pymysql.cursors.DictCursor,
+        charset='utf8mb4'
+    )
+
 def cek_mahasiswa():
     if 'user_id' not in session:
         return redirect(url_for('index'))
     if session.get('role') == 'orangtua':
         return redirect(url_for('dashboard_orangtua'))
     return None
-mail = Mail(app)
+
+def generate_kode():
+    return ''.join(random.choices(string.ascii_uppercase + string.digits, k=6))
 
 def cek_dan_buat_notifikasi(user_id):
     try:
-        cursor = mysql.connection.cursor(pymysql.cursors.DictCursor)
+        conn = get_db()
+        cursor = conn.cursor()
         cursor.execute('SELECT * FROM users WHERE id = %s', (user_id,))
         user = cursor.fetchone()
 
@@ -68,74 +75,60 @@ def cek_dan_buat_notifikasi(user_id):
             nama_kategori = p['nama']
             total_keluar = float(p['total'])
             batas = kategori_anggaran.get(nama_kategori, 0)
-
             if batas <= 0:
                 continue
-
             persen = (total_keluar / batas) * 100
-
             cursor.execute('''
                 SELECT id FROM notifikasi
-                WHERE user_id = %s
-                AND judul LIKE %s
+                WHERE user_id = %s AND judul LIKE %s
                 AND DATE(created_at) = CURDATE()
             ''', (user_id, f'%{nama_kategori}%'))
-            sudah_ada = cursor.fetchone()
-
-            if sudah_ada:
+            if cursor.fetchone():
                 continue
-
             if persen >= 100:
                 cursor.execute('''
                     INSERT INTO notifikasi (user_id, judul, pesan, tipe)
                     VALUES (%s, %s, %s, 'bahaya')
-                ''', (
-                    user_id,
-                    f'Anggaran {nama_kategori} Terlampaui!',
-                    f'Pengeluaran {nama_kategori} bulan ini Rp {total_keluar:,.0f} '
-                    f'melebihi anggaran Rp {batas:,.0f}.'
-                ))
+                ''', (user_id, f'Anggaran {nama_kategori} Terlampaui!',
+                      f'Pengeluaran {nama_kategori} Rp {total_keluar:,.0f} melebihi anggaran Rp {batas:,.0f}.'))
             elif persen >= 80:
                 cursor.execute('''
                     INSERT INTO notifikasi (user_id, judul, pesan, tipe)
                     VALUES (%s, %s, %s, 'peringatan')
-                ''', (
-                    user_id,
-                    f'Anggaran {nama_kategori} Hampir Habis',
-                    f'Pengeluaran {nama_kategori} sudah {persen:.0f}% '
-                    f'dari anggaran Rp {batas:,.0f}.'
-                ))
-
-        mysql.connection.commit()
+                ''', (user_id, f'Anggaran {nama_kategori} Hampir Habis',
+                      f'Pengeluaran {nama_kategori} sudah {persen:.0f}% dari anggaran Rp {batas:,.0f}.'))
+        conn.commit()
+        conn.close()
     except Exception as e:
         print(f'Error cek notifikasi: {e}')
 
-
 def ambil_notifikasi(user_id):
     try:
-        cursor = mysql.connection.cursor(pymysql.cursors.DictCursor)
+        conn = get_db()
+        cursor = conn.cursor()
         cursor.execute('''
-            SELECT * FROM notifikasi
-            WHERE user_id = %s
-            ORDER BY created_at DESC
-            LIMIT 10
+            SELECT * FROM notifikasi WHERE user_id = %s
+            ORDER BY created_at DESC LIMIT 10
         ''', (user_id,))
-        return cursor.fetchall()
+        result = cursor.fetchall()
+        conn.close()
+        return result
     except:
         return []
 
-
 def hitung_notifikasi_belum_dibaca(user_id):
     try:
-        cursor = mysql.connection.cursor(pymysql.cursors.DictCursor)
+        conn = get_db()
+        cursor = conn.cursor()
         cursor.execute('''
             SELECT COUNT(*) as total FROM notifikasi
             WHERE user_id = %s AND sudah_dibaca = 0
         ''', (user_id,))
-        return cursor.fetchone()['total']
+        result = cursor.fetchone()['total']
+        conn.close()
+        return result
     except:
         return 0
-
 
 def kirim_email_reminder(email, nama):
     try:
@@ -155,23 +148,11 @@ def kirim_email_reminder(email, nama):
                 <h3 style="color: #0f1f17;">Halo, {nama}!</h3>
                 <p style="color: #444; line-height: 1.6;">
                     Ini adalah pengingat harianmu untuk mencatat transaksi keuangan hari ini.
-                    Mencatat secara rutin membantu kamu memahami pola pengeluaran dan
-                    menjaga kesehatan finansialmu.
                 </p>
-                <div style="background: white; border-left: 4px solid #1a7a4a;
-                            padding: 16px; border-radius: 8px; margin: 20px 0;">
-                    <p style="margin: 0; color: #1a7a4a; font-weight: bold;">Tips Hari Ini</p>
-                    <p style="margin: 8px 0 0 0; color: #444; font-size: 14px;">
-                        Catat setiap pengeluaran sekecil apapun — pengeluaran kecil
-                        yang tidak tercatat sering menjadi penyebab utama kebocoran
-                        keuangan tanpa disadari.
-                    </p>
-                </div>
                 <div style="text-align: center; margin-top: 24px;">
                     <a href="http://localhost:5000/transaksi"
                        style="background: #1a7a4a; color: white; padding: 12px 28px;
-                              border-radius: 8px; text-decoration: none;
-                              font-weight: bold; display: inline-block;">
+                              border-radius: 8px; text-decoration: none; font-weight: bold;">
                         Catat Transaksi Sekarang
                     </a>
                 </div>
@@ -186,49 +167,48 @@ def kirim_email_reminder(email, nama):
     except Exception as e:
         print(f'Gagal kirim email: {e}')
         return False
-    
+
 def update_jejak_finansial(user_id):
     try:
-        cursor = mysql.connection.cursor(pymysql.cursors.DictCursor)
+        conn = get_db()
+        cursor = conn.cursor()
         cursor.execute('''
-                       INSERT IGNORE INTO jejak_finansial (user_id, tanggal)
-                       VALUES (%s, CURDATE())
-                       ''', (user_id,))
-        mysql.connection.commit()
+            INSERT IGNORE INTO jejak_finansial (user_id, tanggal)
+            VALUES (%s, CURDATE())
+        ''', (user_id,))
+        conn.commit()
+        conn.close()
     except Exception as e:
-        print(f'Error update jejak finansial: {e}')
+        print(f'Error update jejak: {e}')
 
 def hitung_jejak_finansial(user_id):
     try:
-        cursor = mysql.connection.cursor(pymysql.cursors.DictCursor)
-        cursor. execute('''
-                        SELECT tanggal FROM jejak_finansial
-                        WHERE user_id = %s
-                        ORDER BY tanggal DESC
-                        ''', (user_id,))
+        conn = get_db()
+        cursor = conn.cursor()
+        cursor.execute('''
+            SELECT tanggal FROM jejak_finansial
+            WHERE user_id = %s ORDER BY tanggal DESC
+        ''', (user_id,))
         rows = cursor.fetchall()
-
+        conn.close()
         if not rows:
             return 0
-        
-        from datetime import date, timedelta
         hari_ini = date.today()
         streak = 0
-
         for i, row in enumerate(rows):
-            tanggal = row['tanggal']
-            if isinstance(tanggal, str):
-                tanggal = datetime.strptime(tanggal, '%Y-%m-%d').date()
-                if tanggal == expected:
-                    streak += 1
-                else:
-                    break
-
+            tgl = row['tanggal']
+            if isinstance(tgl, str):
+                tgl = datetime.strptime(tgl, '%Y-%m-%d').date()
+            expected = hari_ini - timedelta(days=i)
+            if tgl == expected:
+                streak += 1
+            else:
+                break
         return streak
     except Exception as e:
         print(f'Error hitung jejak: {e}')
-        return 0        
-    
+        return 0
+
 @app.context_processor
 def inject_globals():
     notif_count = 0
@@ -249,24 +229,19 @@ def index():
     if request.method == 'POST':
         email = request.form['email']
         password = hashlib.md5(request.form['password'].encode()).hexdigest()
-
-        cursor = mysql.connection.cursor(pymysql.cursors.DictCursor)
-        cursor.execute('SELECT * FROM users WHERE email = %s AND password = %s',
-                       (email, password))
+        conn = get_db()
+        cursor = conn.cursor()
+        cursor.execute('SELECT * FROM users WHERE email = %s AND password = %s', (email, password))
         user = cursor.fetchone()
-
+        conn.close()
         if user:
             session['user_id'] = user['id']
             session['nama'] = user['nama_lengkap']
             session['role'] = user['role']
-
             if user['role'] == 'orangtua':
                 return redirect(url_for('dashboard_orangtua'))
-            else:
-                return redirect(url_for('dashboard'))
-        else:
-            return render_template('login.html', error='Email atau password salah!')
-
+            return redirect(url_for('dashboard'))
+        return render_template('login.html', error='Email atau password salah!')
     return render_template('login.html')
 
 @app.route('/register', methods=['GET', 'POST'])
@@ -276,23 +251,21 @@ def register():
         email = request.form['email']
         password = hashlib.md5(request.form['password'].encode()).hexdigest()
         universitas = request.form.get('universitas', '')
-
-        cursor = mysql.connection.cursor(pymysql.cursors.DictCursor)
-        cursor.execute('SELECT * FROM users WHERE email = %s', (email,))
-        existing = cursor.fetchone()
-
-        if existing:
-            return render_template('register.html', error='Email sudah terdaftar!')
         role = request.form.get('role', 'mahasiswa')
+        conn = get_db()
+        cursor = conn.cursor()
+        cursor.execute('SELECT * FROM users WHERE email = %s', (email,))
+        if cursor.fetchone():
+            conn.close()
+            return render_template('register.html', error='Email sudah terdaftar!')
         cursor.execute('''
             INSERT INTO users (nama_lengkap, email, password, universitas, role)
             VALUES (%s, %s, %s, %s, %s)
         ''', (nama, email, password, universitas, role))
-        mysql.connection.commit()
+        conn.commit()
+        conn.close()
         return redirect(url_for('index'))
-
     return render_template('register.html')
-
 
 @app.route('/logout')
 def logout():
@@ -301,168 +274,124 @@ def logout():
 
 @app.route('/dashboard')
 def dashboard():
-    if 'user_id' not in session:
-        return redirect(url_for('index'))
-
+    cek = cek_mahasiswa()
+    if cek: return cek
     user_id = session['user_id']
-    cursor = mysql.connection.cursor(pymysql.cursors.DictCursor)
+    conn = get_db()
+    cursor = conn.cursor()
 
     cursor.execute('''
         SELECT COUNT(*) as total FROM (
-            SELECT id FROM income
-            WHERE user_id = %s AND DATE(created_at) = CURDATE()
+            SELECT id FROM income WHERE user_id = %s AND DATE(created_at) = CURDATE()
             UNION ALL
-            SELECT id FROM expenses
-            WHERE user_id = %s AND DATE(created_at) = CURDATE()
+            SELECT id FROM expenses WHERE user_id = %s AND DATE(created_at) = CURDATE()
         ) as hari_ini
     ''', (user_id, user_id))
     sudah_catat = cursor.fetchone()['total']
 
     if sudah_catat == 0:
         cursor.execute('''
-            SELECT id FROM notifikasi
-            WHERE user_id = %s
-            AND judul LIKE %s
-            AND DATE(created_at) = CURDATE()
+            SELECT id FROM notifikasi WHERE user_id = %s
+            AND judul LIKE %s AND DATE(created_at) = CURDATE()
         ''', (user_id, '%Reminder%'))
-        sudah_reminder = cursor.fetchone()
-
-        if not sudah_reminder:
+        if not cursor.fetchone():
             cursor.execute('SELECT * FROM users WHERE id = %s', (user_id,))
             user_data = cursor.fetchone()
             kirim_email_reminder(user_data['email'], user_data['nama_lengkap'])
             cursor.execute('''
                 INSERT INTO notifikasi (user_id, judul, pesan, tipe)
-                VALUES (%s, %s, %s, 'info')
-            ''', (
-                user_id,
-                'Reminder Harian Terkirim',
-                'Email reminder untuk mencatat transaksi hari ini sudah dikirim.'
-            ))
-            mysql.connection.commit()
+                VALUES (%s, 'Reminder Harian Terkirim',
+                'Email reminder sudah dikirim.', 'info')
+            ''', (user_id,))
+            conn.commit()
 
     cursor.execute('''
         SELECT COALESCE(SUM(jumlah), 0) as total FROM income
-        WHERE user_id = %s
-        AND MONTH(tanggal) = MONTH(CURDATE())
+        WHERE user_id = %s AND MONTH(tanggal) = MONTH(CURDATE())
         AND YEAR(tanggal) = YEAR(CURDATE())
     ''', (user_id,))
     total_pemasukan = cursor.fetchone()['total']
 
     cursor.execute('''
         SELECT COALESCE(SUM(jumlah), 0) as total FROM expenses
-        WHERE user_id = %s
-        AND MONTH(tanggal) = MONTH(CURDATE())
+        WHERE user_id = %s AND MONTH(tanggal) = MONTH(CURDATE())
         AND YEAR(tanggal) = YEAR(CURDATE())
     ''', (user_id,))
     total_pengeluaran = cursor.fetchone()['total']
 
     saldo = total_pemasukan - total_pengeluaran
-
-    if total_pemasukan > 0:
-        persen_tabungan = (saldo / total_pemasukan) * 100
-        fhs = min(100, max(0, round(persen_tabungan)))
-    else:
-        fhs = 0
+    fhs = min(100, max(0, round((saldo / total_pemasukan) * 100))) if total_pemasukan > 0 else 0
 
     cursor.execute('''
         SELECT e.jumlah, e.tanggal, e.keterangan, c.nama as kategori
-        FROM expenses e
-        LEFT JOIN categories c ON e.category_id = c.id
-        WHERE e.user_id = %s
-        ORDER BY e.tanggal DESC, e.created_at DESC
-        LIMIT 5
+        FROM expenses e LEFT JOIN categories c ON e.category_id = c.id
+        WHERE e.user_id = %s ORDER BY e.tanggal DESC, e.created_at DESC LIMIT 5
     ''', (user_id,))
     transaksi = cursor.fetchall()
-
+    conn.close()
     jejak = hitung_jejak_finansial(user_id)
 
     return render_template('dashboard.html',
         nama=session['nama'],
         total_pemasukan=total_pemasukan,
         total_pengeluaran=total_pengeluaran,
-        saldo=saldo,
-        fhs=fhs,
-        transaksi=transaksi,
-        jejak=jejak
+        saldo=saldo, fhs=fhs,
+        transaksi=transaksi, jejak=jejak
     )
 
 @app.route('/transaksi')
 def transaksi():
     cek = cek_mahasiswa()
-    if cek: return
-    if 'user_id' not in session:
-        return redirect(url_for('index'))
-
+    if cek: return cek
     user_id = session['user_id']
-    cursor = mysql.connection.cursor(pymysql.cursors.DictCursor)
-
+    conn = get_db()
+    cursor = conn.cursor()
     sekarang = datetime.now()
     bulan = int(request.args.get('bulan', sekarang.month))
     tahun = int(request.args.get('tahun', sekarang.year))
 
-    cursor.execute('''
-        SELECT * FROM categories
-        WHERE is_default = 1 OR user_id = %s
-    ''', (user_id,))
+    cursor.execute('SELECT * FROM categories WHERE is_default = 1 OR user_id = %s', (user_id,))
     kategori = cursor.fetchall()
 
     cursor.execute('''
-        SELECT jumlah, tanggal, keterangan, sumber as kategori,
-               'pemasukan' as jenis
-        FROM income
-        WHERE user_id = %s
-        AND MONTH(tanggal) = %s AND YEAR(tanggal) = %s
+        SELECT jumlah, tanggal, keterangan, sumber as kategori, 'pemasukan' as jenis
+        FROM income WHERE user_id = %s AND MONTH(tanggal) = %s AND YEAR(tanggal) = %s
         UNION ALL
-        SELECT e.jumlah, e.tanggal, e.keterangan, c.nama as kategori,
-               'pengeluaran' as jenis
-        FROM expenses e
-        LEFT JOIN categories c ON e.category_id = c.id
-        WHERE e.user_id = %s
-        AND MONTH(e.tanggal) = %s AND YEAR(e.tanggal) = %s
+        SELECT e.jumlah, e.tanggal, e.keterangan, c.nama as kategori, 'pengeluaran' as jenis
+        FROM expenses e LEFT JOIN categories c ON e.category_id = c.id
+        WHERE e.user_id = %s AND MONTH(e.tanggal) = %s AND YEAR(e.tanggal) = %s
         ORDER BY tanggal DESC
     ''', (user_id, bulan, tahun, user_id, bulan, tahun))
     riwayat = cursor.fetchall()
+    conn.close()
 
     bulan_list = [
-        {'num': 1,  'nama': 'Januari'},
-        {'num': 2,  'nama': 'Februari'},
-        {'num': 3,  'nama': 'Maret'},
-        {'num': 4,  'nama': 'April'},
-        {'num': 5,  'nama': 'Mei'},
-        {'num': 6,  'nama': 'Juni'},
-        {'num': 7,  'nama': 'Juli'},
-        {'num': 8,  'nama': 'Agustus'},
-        {'num': 9,  'nama': 'September'},
-        {'num': 10, 'nama': 'Oktober'},
-        {'num': 11, 'nama': 'November'},
-        {'num': 12, 'nama': 'Desember'},
+        {'num': 1, 'nama': 'Januari'}, {'num': 2, 'nama': 'Februari'},
+        {'num': 3, 'nama': 'Maret'}, {'num': 4, 'nama': 'April'},
+        {'num': 5, 'nama': 'Mei'}, {'num': 6, 'nama': 'Juni'},
+        {'num': 7, 'nama': 'Juli'}, {'num': 8, 'nama': 'Agustus'},
+        {'num': 9, 'nama': 'September'}, {'num': 10, 'nama': 'Oktober'},
+        {'num': 11, 'nama': 'November'}, {'num': 12, 'nama': 'Desember'},
     ]
     tahun_list = list(range(sekarang.year, sekarang.year - 3, -1))
 
     return render_template('transaksi.html',
-        nama=session['nama'],
-        kategori=kategori,
-        riwayat=riwayat,
-        bulan_aktif=bulan,
-        tahun_aktif=tahun,
-        bulan_list=bulan_list,
-        tahun_list=tahun_list
+        nama=session['nama'], kategori=kategori, riwayat=riwayat,
+        bulan_aktif=bulan, tahun_aktif=tahun,
+        bulan_list=bulan_list, tahun_list=tahun_list
     )
-
 
 @app.route('/transaksi/tambah', methods=['POST'])
 def tambah_transaksi():
-    if 'user_id' not in session:
-        return redirect(url_for('index'))
-
+    cek = cek_mahasiswa()
+    if cek: return cek
     user_id = session['user_id']
     jenis = request.form['jenis']
     jumlah = request.form['jumlah']
     tanggal = request.form['tanggal']
     keterangan = request.form.get('keterangan', '')
-
-    cursor = mysql.connection.cursor(pymysql.cursors.DictCursor)
+    conn = get_db()
+    cursor = conn.cursor()
 
     if jenis == 'pengeluaran':
         category_id = request.form['category_id']
@@ -477,39 +406,34 @@ def tambah_transaksi():
             VALUES (%s, %s, %s, %s, %s)
         ''', (user_id, jumlah, sumber, tanggal, keterangan))
 
-    mysql.connection.commit()
+    conn.commit()
+    conn.close()
     cek_dan_buat_notifikasi(user_id)
     update_jejak_finansial(user_id)
     return redirect(url_for('transaksi'))
 
 @app.route('/analisis')
 def analisis():
-    if 'user_id' not in session:
-        return redirect(url_for('index'))
-
+    cek = cek_mahasiswa()
+    if cek: return cek
     user_id = session['user_id']
-    cursor = mysql.connection.cursor(pymysql.cursors.DictCursor)
+    conn = get_db()
+    cursor = conn.cursor()
 
     cursor.execute('''
         SELECT c.nama, SUM(e.jumlah) as total
-        FROM expenses e
-        JOIN categories c ON e.category_id = c.id
-        WHERE e.user_id = %s
-        AND MONTH(e.tanggal) = MONTH(CURDATE())
-        AND YEAR(e.tanggal) = YEAR(CURDATE())
-        GROUP BY c.nama
+        FROM expenses e JOIN categories c ON e.category_id = c.id
+        WHERE e.user_id = %s AND MONTH(e.tanggal) = MONTH(CURDATE())
+        AND YEAR(e.tanggal) = YEAR(CURDATE()) GROUP BY c.nama
     ''', (user_id,))
     pie_rows = cursor.fetchall()
     pie_labels = [r['nama'] for r in pie_rows]
     pie_data = [float(r['total']) for r in pie_rows]
-
     kategori_terbesar = pie_labels[pie_data.index(max(pie_data))] if pie_data else '-'
 
     cursor.execute('''
         SELECT COALESCE(SUM(jumlah), 0) as total, COUNT(DISTINCT tanggal) as hari
-        FROM expenses
-        WHERE user_id = %s
-        AND MONTH(tanggal) = MONTH(CURDATE())
+        FROM expenses WHERE user_id = %s AND MONTH(tanggal) = MONTH(CURDATE())
         AND YEAR(tanggal) = YEAR(CURDATE())
     ''', (user_id,))
     row = cursor.fetchone()
@@ -517,146 +441,85 @@ def analisis():
 
     cursor.execute('''
         SELECT COALESCE(SUM(jumlah), 0) as total FROM income
-        WHERE user_id = %s
-        AND MONTH(tanggal) = MONTH(CURDATE())
+        WHERE user_id = %s AND MONTH(tanggal) = MONTH(CURDATE())
         AND YEAR(tanggal) = YEAR(CURDATE())
     ''', (user_id,))
     total_masuk = float(cursor.fetchone()['total'])
 
     cursor.execute('''
         SELECT COALESCE(SUM(jumlah), 0) as total FROM expenses
-        WHERE user_id = %s
-        AND MONTH(tanggal) = MONTH(CURDATE())
+        WHERE user_id = %s AND MONTH(tanggal) = MONTH(CURDATE())
         AND YEAR(tanggal) = YEAR(CURDATE())
     ''', (user_id,))
     total_keluar = float(cursor.fetchone()['total'])
-
-    persen_tabungan = round(
-        ((total_masuk - total_keluar) / total_masuk) * 100
-    ) if total_masuk > 0 else 0
-
-    cursor.execute('''
-        SELECT MONTH(tanggal) as bln, SUM(jumlah) as total
-        FROM income WHERE user_id = %s
-        AND tanggal >= DATE_SUB(CURDATE(), INTERVAL 3 MONTH)
-        GROUP BY MONTH(tanggal) ORDER BY bln
-    ''', (user_id,))
-    inc_rows = {r['bln']: float(r['total']) for r in cursor.fetchall()}
-
-    cursor.execute('''
-        SELECT MONTH(tanggal) as bln, SUM(jumlah) as total
-        FROM expenses WHERE user_id = %s
-        AND tanggal >= DATE_SUB(CURDATE(), INTERVAL 3 MONTH)
-        GROUP BY MONTH(tanggal) ORDER BY bln
-    ''', (user_id,))
-    exp_rows = {r['bln']: float(r['total']) for r in cursor.fetchall()}
-
-    bulan_names = ['Jan','Feb','Mar','Apr','Mei','Jun',
-                   'Jul','Agu','Sep','Okt','Nov','Des']
-    all_months = sorted(set(list(inc_rows.keys()) + list(exp_rows.keys())))
-    bar_labels = [bulan_names[m-1] for m in all_months]
-    bar_pemasukan = [inc_rows.get(m, 0) for m in all_months]
-    bar_pengeluaran = [exp_rows.get(m, 0) for m in all_months]
-
-    cursor.execute('''
-        SELECT tanggal, SUM(jumlah) as total
-        FROM expenses WHERE user_id = %s
-        AND MONTH(tanggal) = MONTH(CURDATE())
-        AND YEAR(tanggal) = YEAR(CURDATE())
-        GROUP BY tanggal ORDER BY tanggal
-    ''', (user_id,))
-    tren_rows = cursor.fetchall()
-    tren_labels = [str(r['tanggal']) for r in tren_rows]
-    tren_data = [float(r['total']) for r in tren_rows]
+    persen_tabungan = round(((total_masuk - total_keluar) / total_masuk) * 100) if total_masuk > 0 else 0
+    conn.close()
 
     return render_template('analisis.html',
         nama=session['nama'],
-        pie_labels=pie_labels,
-        pie_data=pie_data,
-        rata_harian=rata_harian,
-        persen_tabungan=persen_tabungan,
+        pie_labels=pie_labels, pie_data=pie_data,
+        rata_harian=rata_harian, persen_tabungan=persen_tabungan,
         kategori_terbesar=kategori_terbesar,
-        bar_labels=bar_labels,
-        bar_pemasukan=bar_pemasukan,
-        bar_pengeluaran=bar_pengeluaran,
-        tren_labels=tren_labels,
-        tren_data=tren_data
+        bar_labels=[], bar_pemasukan=[], bar_pengeluaran=[],
+        tren_labels=[], tren_data=[]
     )
 
 @app.route('/profil')
 def profil():
-    if 'user_id' not in session:
-        return redirect(url_for('index'))
-
+    cek = cek_mahasiswa()
+    if cek: return cek
     user_id = session['user_id']
-    cursor = mysql.connection.cursor(pymysql.cursors.DictCursor)
-
+    conn = get_db()
+    cursor = conn.cursor()
     cursor.execute('SELECT * FROM users WHERE id = %s', (user_id,))
     user = cursor.fetchone()
-
     cursor.execute('''
         SELECT COUNT(*) as total FROM (
             SELECT id FROM income WHERE user_id = %s
-            UNION ALL
-            SELECT id FROM expenses WHERE user_id = %s
+            UNION ALL SELECT id FROM expenses WHERE user_id = %s
         ) as semua
     ''', (user_id, user_id))
     total_transaksi = cursor.fetchone()['total']
-
+    conn.close()
     hari_bergabung = (datetime.now() - user['created_at']).days + 1
-    success = request.args.get('success')
-    pesan = 'Perubahan berhasil disimpan!' if success else None
-
+    pesan = 'Perubahan berhasil disimpan!' if request.args.get('success') else None
     return render_template('profil.html',
-        user=user,
-        total_transaksi=total_transaksi,
-        hari_bergabung=hari_bergabung,
-        success=pesan
+        user=user, total_transaksi=total_transaksi,
+        hari_bergabung=hari_bergabung, success=pesan
     )
-
 
 @app.route('/profil/update', methods=['POST'])
 def update_profil():
-    if 'user_id' not in session:
-        return redirect(url_for('index'))
-
+    cek = cek_mahasiswa()
+    if cek: return cek
     user_id = session['user_id']
     jenis = request.form['jenis']
-    cursor = mysql.connection.cursor(pymysql.cursors.DictCursor)
+    conn = get_db()
+    cursor = conn.cursor()
 
     if jenis == 'profil':
         nama = request.form['nama']
         universitas = request.form.get('universitas', '')
         password_baru = request.form.get('password_baru', '')
         konfirmasi = request.form.get('konfirmasi_password', '')
-
         if password_baru:
             if password_baru != konfirmasi:
                 cursor.execute('SELECT * FROM users WHERE id = %s', (user_id,))
                 user = cursor.fetchone()
-                return render_template('profil.html', user=user,
-                    error='Konfirmasi password tidak cocok!')
+                conn.close()
+                return render_template('profil.html', user=user, error='Konfirmasi password tidak cocok!')
             password_hash = hashlib.md5(password_baru.encode()).hexdigest()
-            cursor.execute('''
-                UPDATE users SET nama_lengkap=%s, universitas=%s, password=%s
-                WHERE id = %s
-            ''', (nama, universitas, password_hash, user_id))
+            cursor.execute('UPDATE users SET nama_lengkap=%s, universitas=%s, password=%s WHERE id=%s',
+                           (nama, universitas, password_hash, user_id))
         else:
-            cursor.execute('''
-                UPDATE users SET nama_lengkap=%s, universitas=%s
-                WHERE id = %s
-            ''', (nama, universitas, user_id))
-
+            cursor.execute('UPDATE users SET nama_lengkap=%s, universitas=%s WHERE id=%s',
+                           (nama, universitas, user_id))
         session['nama'] = nama
-
     elif jenis == 'anggaran':
         cursor.execute('''
-            UPDATE users SET
-                anggaran_makan=%s, anggaran_transportasi=%s,
-                anggaran_pendidikan=%s, anggaran_komunikasi=%s,
-                anggaran_hiburan=%s, anggaran_kesehatan=%s,
-                anggaran_pribadi=%s, anggaran_lainnya=%s
-            WHERE id = %s
+            UPDATE users SET anggaran_makan=%s, anggaran_transportasi=%s,
+            anggaran_pendidikan=%s, anggaran_komunikasi=%s, anggaran_hiburan=%s,
+            anggaran_kesehatan=%s, anggaran_pribadi=%s, anggaran_lainnya=%s WHERE id=%s
         ''', (
             request.form.get('anggaran_makan', 0),
             request.form.get('anggaran_transportasi', 0),
@@ -668,8 +531,8 @@ def update_profil():
             request.form.get('anggaran_lainnya', 0),
             user_id
         ))
-
-    mysql.connection.commit()
+    conn.commit()
+    conn.close()
     return redirect(url_for('profil') + '?success=1')
 
 @app.route('/notifikasi')
@@ -680,118 +543,83 @@ def notifikasi():
     hasil = []
     for n in notif:
         hasil.append({
-            'id': n['id'],
-            'judul': n['judul'],
-            'pesan': n['pesan'],
-            'tipe': n['tipe'],
-            'sudah_dibaca': n['sudah_dibaca'],
+            'id': n['id'], 'judul': n['judul'], 'pesan': n['pesan'],
+            'tipe': n['tipe'], 'sudah_dibaca': n['sudah_dibaca'],
             'created_at': str(n['created_at'])
         })
     return jsonify({'notifikasi': hasil, 'status': 'ok'})
-
 
 @app.route('/notifikasi/baca-semua')
 def baca_semua_notifikasi():
     if 'user_id' not in session:
         return redirect(url_for('index'))
-    cursor = mysql.connection.cursor(pymysql.cursors.DictCursor)
-    cursor.execute('''
-        UPDATE notifikasi SET sudah_dibaca = 1
-        WHERE user_id = %s
-    ''', (session['user_id'],))
-    mysql.connection.commit()
+    conn = get_db()
+    cursor = conn.cursor()
+    cursor.execute('UPDATE notifikasi SET sudah_dibaca = 1 WHERE user_id = %s', (session['user_id'],))
+    conn.commit()
+    conn.close()
     return redirect(request.referrer or url_for('dashboard'))
-
 
 @app.route('/kirim-reminder')
 def kirim_reminder():
     if 'user_id' not in session:
         return redirect(url_for('index'))
-
     user_id = session['user_id']
-    cursor = mysql.connection.cursor(pymysql.cursors.DictCursor)
+    conn = get_db()
+    cursor = conn.cursor()
     cursor.execute('SELECT * FROM users WHERE id = %s', (user_id,))
     user = cursor.fetchone()
-
     cursor.execute('''
         SELECT COUNT(*) as total FROM (
-            SELECT id FROM income
-            WHERE user_id = %s AND DATE(created_at) = CURDATE()
-            UNION ALL
-            SELECT id FROM expenses
-            WHERE user_id = %s AND DATE(created_at) = CURDATE()
+            SELECT id FROM income WHERE user_id = %s AND DATE(created_at) = CURDATE()
+            UNION ALL SELECT id FROM expenses WHERE user_id = %s AND DATE(created_at) = CURDATE()
         ) as hari_ini
     ''', (user_id, user_id))
     sudah_catat = cursor.fetchone()['total']
-
+    conn.close()
     if sudah_catat > 0:
-        return jsonify({
-            'status': 'skip',
-            'pesan': 'Kamu sudah mencatat transaksi hari ini!'
-        })
-
+        return jsonify({'status': 'skip', 'pesan': 'Kamu sudah mencatat transaksi hari ini!'})
     hasil = kirim_email_reminder(user['email'], user['nama_lengkap'])
-
     if hasil:
-        return jsonify({
-            'status': 'ok',
-            'pesan': f'Reminder berhasil dikirim ke {user["email"]}'
-        })
-    else:
-        return jsonify({
-            'status': 'error',
-            'pesan': 'Gagal mengirim email. Cek konfigurasi email.'
-        })
+        return jsonify({'status': 'ok', 'pesan': f'Reminder berhasil dikirim ke {user["email"]}'})
+    return jsonify({'status': 'error', 'pesan': 'Gagal mengirim email.'})
 
 @app.route('/tantangan')
 def tantangan():
-    if 'user_id' not in session:
-        return redirect(url_for('index'))
-
+    cek = cek_mahasiswa()
+    if cek: return cek
     user_id = session['user_id']
-    cursor = mysql.connection.cursor(pymysql.cursors.DictCursor)
-    from datetime import date, timedelta
+    conn = get_db()
+    cursor = conn.cursor()
 
-    cursor.execute('''
-        SELECT * FROM categories
-        WHERE is_default = 1 OR user_id = %s
-    ''', (user_id,))
+    cursor.execute('SELECT * FROM categories WHERE is_default = 1 OR user_id = %s', (user_id,))
     kategori = cursor.fetchall()
 
     cursor.execute('''
         UPDATE challenges SET status = 'selesai'
-        WHERE user_id = %s
-        AND status = 'aktif'
-        AND tanggal_selesai < CURDATE()
+        WHERE user_id = %s AND status = 'aktif' AND tanggal_selesai < CURDATE()
     ''', (user_id,))
-    mysql.connection.commit()
+    conn.commit()
 
     cursor.execute('''
-        SELECT c.*, cat.nama as nama_kategori
-        FROM challenges c
+        SELECT c.*, cat.nama as nama_kategori FROM challenges c
         LEFT JOIN categories cat ON c.category_id = cat.id
-        WHERE c.user_id = %s AND c.status = 'aktif'
-        ORDER BY c.created_at DESC
+        WHERE c.user_id = %s AND c.status = 'aktif' ORDER BY c.created_at DESC
     ''', (user_id,))
     aktif_rows = cursor.fetchall()
 
     tantangan_aktif = []
     for t in aktif_rows:
         tgl_mulai = t['tanggal_mulai']
-        tgl_selesai = t['tanggal_selesai']
         hari_berjalan = (date.today() - tgl_mulai).days + 1
         persen_progress = min(100, round((hari_berjalan / t['durasi']) * 100))
 
         cursor.execute('''
-            SELECT COALESCE(SUM(jumlah), 0) as total
-            FROM expenses
-            WHERE user_id = %s
-            AND category_id = %s
-            AND tanggal BETWEEN %s AND CURDATE()
+            SELECT COALESCE(SUM(jumlah), 0) as total FROM expenses
+            WHERE user_id = %s AND category_id = %s AND tanggal BETWEEN %s AND CURDATE()
         ''', (user_id, t['category_id'], tgl_mulai))
         total_keluar = float(cursor.fetchone()['total'])
-        total_budget = t['target_harian'] * hari_berjalan
-        total_hemat = max(0, float(total_budget) - total_keluar)
+        total_hemat = max(0, float(t['target_harian']) * hari_berjalan - total_keluar)
 
         kalender = []
         for i in range(t['durasi']):
@@ -800,180 +628,122 @@ def tantangan():
                 status = 'belum'
             else:
                 cursor.execute('''
-                    SELECT COALESCE(SUM(jumlah), 0) as total
-                    FROM expenses
-                    WHERE user_id = %s
-                    AND category_id = %s
-                    AND tanggal = %s
+                    SELECT COALESCE(SUM(jumlah), 0) as total FROM expenses
+                    WHERE user_id = %s AND category_id = %s AND tanggal = %s
                 ''', (user_id, t['category_id'], tgl))
                 keluar_hari = float(cursor.fetchone()['total'])
                 status = 'berhasil' if keluar_hari <= float(t['target_harian']) else 'gagal'
+            kalender.append({'tgl': tgl.strftime('%d'), 'tanggal': str(tgl), 'status': status})
 
-            kalender.append({
-                'tgl': tgl.strftime('%d'),
-                'tanggal': str(tgl),
-                'status': status
-            })
-
-        tantangan_aktif.append({
-            **dict(t),
-            'hari_berjalan': hari_berjalan,
-            'persen_progress': persen_progress,
-            'total_hemat': total_hemat,
-            'kalender': kalender
-        })
+        tantangan_aktif.append({**dict(t), 'hari_berjalan': hari_berjalan,
+            'persen_progress': persen_progress, 'total_hemat': total_hemat, 'kalender': kalender})
 
     cursor.execute('''
-        SELECT c.*, cat.nama as nama_kategori
-        FROM challenges c
+        SELECT c.*, cat.nama as nama_kategori FROM challenges c
         LEFT JOIN categories cat ON c.category_id = cat.id
-        WHERE c.user_id = %s AND c.status != 'aktif'
-        ORDER BY c.created_at DESC
+        WHERE c.user_id = %s AND c.status != 'aktif' ORDER BY c.created_at DESC
     ''', (user_id,))
     selesai_rows = cursor.fetchall()
 
     tantangan_selesai = []
     for t in selesai_rows:
         cursor.execute('''
-            SELECT COALESCE(SUM(jumlah), 0) as total
-            FROM expenses
-            WHERE user_id = %s
-            AND category_id = %s
-            AND tanggal BETWEEN %s AND %s
+            SELECT COALESCE(SUM(jumlah), 0) as total FROM expenses
+            WHERE user_id = %s AND category_id = %s AND tanggal BETWEEN %s AND %s
         ''', (user_id, t['category_id'], t['tanggal_mulai'], t['tanggal_selesai']))
         total_keluar = float(cursor.fetchone()['total'])
-        total_budget = float(t['target_harian']) * t['durasi']
-        total_hemat = max(0, total_budget - total_keluar)
+        total_hemat = max(0, float(t['target_harian']) * t['durasi'] - total_keluar)
         tantangan_selesai.append({**dict(t), 'total_hemat': total_hemat})
 
-    success = request.args.get('success')
-    pesan = 'Tantangan berhasil dimulai! Semangat!' if success else None
-
+    conn.close()
+    pesan = 'Tantangan berhasil dimulai! Semangat!' if request.args.get('success') else None
     return render_template('tantangan.html',
-        kategori=kategori,
-        tantangan_aktif=tantangan_aktif,
-        tantangan_selesai=tantangan_selesai,
-        success=pesan
+        kategori=kategori, tantangan_aktif=tantangan_aktif,
+        tantangan_selesai=tantangan_selesai, success=pesan
     )
-
 
 @app.route('/tantangan/buat', methods=['POST'])
 def buat_tantangan():
-    if 'user_id' not in session:
-        return redirect(url_for('index'))
-
+    cek = cek_mahasiswa()
+    if cek: return cek
     user_id = session['user_id']
-    from datetime import date, timedelta
-
     nama_tantangan = request.form['nama_tantangan']
     category_id = request.form['category_id']
     target_harian = request.form['target_harian']
     durasi = int(request.form['durasi'])
-
     tanggal_mulai = date.today()
     tanggal_selesai = tanggal_mulai + timedelta(days=durasi - 1)
-
-    cursor = mysql.connection.cursor(pymysql.cursors.DictCursor)
+    conn = get_db()
+    cursor = conn.cursor()
     cursor.execute('''
-        INSERT INTO challenges
-        (user_id, category_id, nama_tantangan, target_harian,
-         durasi, tanggal_mulai, tanggal_selesai)
-        VALUES (%s, %s, %s, %s, %s, %s, %s)
-    ''', (user_id, category_id, nama_tantangan, target_harian,
-          durasi, tanggal_mulai, tanggal_selesai))
-    mysql.connection.commit()
-
+        INSERT INTO challenges (user_id, category_id, nama_tantangan, target_harian,
+        durasi, tanggal_mulai, tanggal_selesai) VALUES (%s, %s, %s, %s, %s, %s, %s)
+    ''', (user_id, category_id, nama_tantangan, target_harian, durasi, tanggal_mulai, tanggal_selesai))
+    conn.commit()
+    conn.close()
     return redirect(url_for('tantangan') + '?success=1')
-
-import random
-import string
-
-def generate_kode():
-    return ''.join(random.choices(string.ascii_uppercase + string.digits, k=6))
 
 @app.route('/family')
 def family():
-    if 'user_id' not in session:
-        return redirect(url_for('index'))
-
+    cek = cek_mahasiswa()
+    if cek: return cek
     user_id = session['user_id']
-    cursor = mysql.connection.cursor(pymysql.cursors.DictCursor)
-
-    cursor.execute('SELECT * FROM family_links WHERE mahasiswa_id = %s LIMIT 1',
-                   (user_id,))
+    conn = get_db()
+    cursor = conn.cursor()
+    cursor.execute('SELECT * FROM family_links WHERE mahasiswa_id = %s LIMIT 1', (user_id,))
     link = cursor.fetchone()
-
     if not link:
         kode = generate_kode()
         cursor.execute('''
             INSERT INTO family_links (mahasiswa_id, kode_undangan, status)
             VALUES (%s, %s, 'pending')
         ''', (user_id, kode))
-        mysql.connection.commit()
+        conn.commit()
         kode_undangan = kode
     else:
         kode_undangan = link['kode_undangan']
-
     cursor.execute('''
-        SELECT u.nama_lengkap, u.email
-        FROM family_links fl
+        SELECT u.nama_lengkap, u.email FROM family_links fl
         JOIN users u ON fl.orangtua_id = u.id
         WHERE fl.mahasiswa_id = %s AND fl.status = 'aktif'
     ''', (user_id,))
     orangtua_terhubung = cursor.fetchall()
-
-    success = request.args.get('success')
-    error = request.args.get('error')
-
+    conn.close()
     return render_template('family.html',
         kode_undangan=kode_undangan,
         orangtua_terhubung=orangtua_terhubung,
-        success='Akun berhasil terhubung!' if success else None,
-        error='Kode undangan tidak valid!' if error else None
+        success='Akun berhasil terhubung!' if request.args.get('success') else None,
+        error='Kode undangan tidak valid!' if request.args.get('error') else None
     )
-
 
 @app.route('/family/hubungkan', methods=['POST'])
 def hubungkan_family():
     if 'user_id' not in session:
         return redirect(url_for('index'))
-
     orangtua_id = session['user_id']
     kode = request.form['kode_undangan'].upper().strip()
-    cursor = mysql.connection.cursor(pymysql.cursors.DictCursor)
-
-    # Cari kode undangan
-    cursor.execute('''
-        SELECT * FROM family_links
-        WHERE kode_undangan = %s AND status = 'pending'
-    ''', (kode,))
+    conn = get_db()
+    cursor = conn.cursor()
+    cursor.execute("SELECT * FROM family_links WHERE kode_undangan = %s AND status = 'pending'", (kode,))
     link = cursor.fetchone()
-
     if not link:
+        conn.close()
         return redirect(url_for('dashboard_orangtua') + '?error=1')
-
-    # Hubungkan akun
-    cursor.execute('''
-        UPDATE family_links
-        SET orangtua_id = %s, status = 'aktif'
-        WHERE kode_undangan = %s
-    ''', (orangtua_id, kode))
-    mysql.connection.commit()
-
+    cursor.execute("UPDATE family_links SET orangtua_id = %s, status = 'aktif' WHERE kode_undangan = %s",
+                   (orangtua_id, kode))
+    conn.commit()
+    conn.close()
     return redirect(url_for('dashboard_orangtua') + '?success=1')
-
 
 @app.route('/dashboard-orangtua')
 def dashboard_orangtua():
     if 'user_id' not in session:
         return redirect(url_for('index'))
-
     orangtua_id = session['user_id']
-    cursor = mysql.connection.cursor(pymysql.cursors.DictCursor)
-
+    conn = get_db()
+    cursor = conn.cursor()
     cursor.execute('''
-        SELECT u.id, u.nama_lengkap, u.universitas
-        FROM family_links fl
+        SELECT u.id, u.nama_lengkap, u.universitas FROM family_links fl
         JOIN users u ON fl.mahasiswa_id = u.id
         WHERE fl.orangtua_id = %s AND fl.status = 'aktif'
     ''', (orangtua_id,))
@@ -982,68 +752,45 @@ def dashboard_orangtua():
     data_anak = []
     for anak in anak_list:
         anak_id = anak['id']
-
         cursor.execute('''
             SELECT COALESCE(SUM(jumlah), 0) as total FROM income
-            WHERE user_id = %s
-            AND MONTH(tanggal) = MONTH(CURDATE())
+            WHERE user_id = %s AND MONTH(tanggal) = MONTH(CURDATE())
             AND YEAR(tanggal) = YEAR(CURDATE())
         ''', (anak_id,))
         total_pemasukan = cursor.fetchone()['total']
-
         cursor.execute('''
             SELECT COALESCE(SUM(jumlah), 0) as total FROM expenses
-            WHERE user_id = %s
-            AND MONTH(tanggal) = MONTH(CURDATE())
+            WHERE user_id = %s AND MONTH(tanggal) = MONTH(CURDATE())
             AND YEAR(tanggal) = YEAR(CURDATE())
         ''', (anak_id,))
         total_pengeluaran = cursor.fetchone()['total']
-
         saldo = total_pemasukan - total_pengeluaran
-        fhs = min(100, max(0, round(
-            ((saldo / total_pemasukan) * 100) if total_pemasukan > 0 else 0
-        )))
-
+        fhs = min(100, max(0, round(((saldo / total_pemasukan) * 100) if total_pemasukan > 0 else 0)))
         cursor.execute('''
-            SELECT c.nama, SUM(e.jumlah) as total
-            FROM expenses e
+            SELECT c.nama, SUM(e.jumlah) as total FROM expenses e
             JOIN categories c ON e.category_id = c.id
-            WHERE e.user_id = %s
-            AND MONTH(e.tanggal) = MONTH(CURDATE())
-            AND YEAR(e.tanggal) = YEAR(CURDATE())
-            GROUP BY c.nama
+            WHERE e.user_id = %s AND MONTH(e.tanggal) = MONTH(CURDATE())
+            AND YEAR(e.tanggal) = YEAR(CURDATE()) GROUP BY c.nama
         ''', (anak_id,))
         pie_rows = cursor.fetchall()
-
-        cursor.execute('''
-            SELECT nama_tantangan, durasi, tanggal_mulai
-            FROM challenges
-            WHERE user_id = %s AND status = 'aktif'
-        ''', (anak_id,))
+        cursor.execute("SELECT nama_tantangan, durasi, tanggal_mulai FROM challenges WHERE user_id = %s AND status = 'aktif'", (anak_id,))
         tantangan = cursor.fetchall()
-
         data_anak.append({
-            'nama': anak['nama_lengkap'],
-            'universitas': anak['universitas'] or '-',
-            'total_pemasukan': total_pemasukan,
-            'total_pengeluaran': total_pengeluaran,
-            'saldo': saldo,
-            'fhs': fhs,
+            'nama': anak['nama_lengkap'], 'universitas': anak['universitas'] or '-',
+            'total_pemasukan': total_pemasukan, 'total_pengeluaran': total_pengeluaran,
+            'saldo': saldo, 'fhs': fhs,
             'pie_labels': [r['nama'] for r in pie_rows],
             'pie_data': [float(r['total']) for r in pie_rows],
             'tantangan': tantangan
         })
-
-    success = request.args.get('success')
-    error = request.args.get('error')
-
+    conn.close()
     return render_template('dashboard_orangtua.html',
-        nama=session['nama'],
-        data_anak=data_anak,
+        nama=session['nama'], data_anak=data_anak,
         sudah_hubungkan=len(data_anak) > 0,
-        success='Berhasil terhubung dengan akun anak!' if success else None,
-        error='Kode undangan tidak valid!' if error else None
+        success='Berhasil terhubung!' if request.args.get('success') else None,
+        error='Kode tidak valid!' if request.args.get('error') else None
     )
 
 if __name__ == '__main__':
-    app.run(debug=True, host='0.0.0.0')
+    port = int(os.environ.get('PORT', 5000))
+    app.run(debug=False, host='0.0.0.0', port=port)
