@@ -1,1 +1,6 @@
 flask
+flask-mysqldb
+flask-mail
+pandas
+gunicorn
+cryptography
