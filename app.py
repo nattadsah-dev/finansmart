@@ -4,9 +4,6 @@ from tkinter import EXCEPTION
 from flask import Flask, render_template, request, redirect, url_for, session, jsonify
 import pymysql
 import pymysql.cursors
-pymysql.install_as_MySQLdb()
-from flask_mysqldb import MySQL
-import MySQLdb.cursors
 import hashlib
 from datetime import datetime
 
@@ -41,7 +38,7 @@ mail = Mail(app)
 
 def cek_dan_buat_notifikasi(user_id):
     try:
-        cursor = mysql.connection.cursor(MySQLdb.cursors.DictCursor)
+        cursor = mysql.connection.cursor(pymysql.cursors.DictCursor)
         cursor.execute('SELECT * FROM users WHERE id = %s', (user_id,))
         user = cursor.fetchone()
 
@@ -116,7 +113,7 @@ def cek_dan_buat_notifikasi(user_id):
 
 def ambil_notifikasi(user_id):
     try:
-        cursor = mysql.connection.cursor(MySQLdb.cursors.DictCursor)
+        cursor = mysql.connection.cursor(pymysql.cursors.DictCursor)
         cursor.execute('''
             SELECT * FROM notifikasi
             WHERE user_id = %s
@@ -130,7 +127,7 @@ def ambil_notifikasi(user_id):
 
 def hitung_notifikasi_belum_dibaca(user_id):
     try:
-        cursor = mysql.connection.cursor(MySQLdb.cursors.DictCursor)
+        cursor = mysql.connection.cursor(pymysql.cursors.DictCursor)
         cursor.execute('''
             SELECT COUNT(*) as total FROM notifikasi
             WHERE user_id = %s AND sudah_dibaca = 0
@@ -192,7 +189,7 @@ def kirim_email_reminder(email, nama):
     
 def update_jejak_finansial(user_id):
     try:
-        cursor = mysql.connection.cursor(MySQLdb.cursors.DictCursor)
+        cursor = mysql.connection.cursor(pymysql.cursors.DictCursor)
         cursor.execute('''
                        INSERT IGNORE INTO jejak_finansial (user_id, tanggal)
                        VALUES (%s, CURDATE())
@@ -203,7 +200,7 @@ def update_jejak_finansial(user_id):
 
 def hitung_jejak_finansial(user_id):
     try:
-        cursor = mysql.connection.cursor(MySQLdb.cursors.DictCursor)
+        cursor = mysql.connection.cursor(pymysql.cursors.DictCursor)
         cursor. execute('''
                         SELECT tanggal FROM jejak_finansial
                         WHERE user_id = %s
@@ -253,7 +250,7 @@ def index():
         email = request.form['email']
         password = hashlib.md5(request.form['password'].encode()).hexdigest()
 
-        cursor = mysql.connection.cursor(MySQLdb.cursors.DictCursor)
+        cursor = mysql.connection.cursor(pymysql.cursors.DictCursor)
         cursor.execute('SELECT * FROM users WHERE email = %s AND password = %s',
                        (email, password))
         user = cursor.fetchone()
@@ -280,7 +277,7 @@ def register():
         password = hashlib.md5(request.form['password'].encode()).hexdigest()
         universitas = request.form.get('universitas', '')
 
-        cursor = mysql.connection.cursor(MySQLdb.cursors.DictCursor)
+        cursor = mysql.connection.cursor(pymysql.cursors.DictCursor)
         cursor.execute('SELECT * FROM users WHERE email = %s', (email,))
         existing = cursor.fetchone()
 
@@ -308,7 +305,7 @@ def dashboard():
         return redirect(url_for('index'))
 
     user_id = session['user_id']
-    cursor = mysql.connection.cursor(MySQLdb.cursors.DictCursor)
+    cursor = mysql.connection.cursor(pymysql.cursors.DictCursor)
 
     cursor.execute('''
         SELECT COUNT(*) as total FROM (
@@ -398,7 +395,7 @@ def transaksi():
         return redirect(url_for('index'))
 
     user_id = session['user_id']
-    cursor = mysql.connection.cursor(MySQLdb.cursors.DictCursor)
+    cursor = mysql.connection.cursor(pymysql.cursors.DictCursor)
 
     sekarang = datetime.now()
     bulan = int(request.args.get('bulan', sekarang.month))
@@ -465,7 +462,7 @@ def tambah_transaksi():
     tanggal = request.form['tanggal']
     keterangan = request.form.get('keterangan', '')
 
-    cursor = mysql.connection.cursor(MySQLdb.cursors.DictCursor)
+    cursor = mysql.connection.cursor(pymysql.cursors.DictCursor)
 
     if jenis == 'pengeluaran':
         category_id = request.form['category_id']
@@ -491,7 +488,7 @@ def analisis():
         return redirect(url_for('index'))
 
     user_id = session['user_id']
-    cursor = mysql.connection.cursor(MySQLdb.cursors.DictCursor)
+    cursor = mysql.connection.cursor(pymysql.cursors.DictCursor)
 
     cursor.execute('''
         SELECT c.nama, SUM(e.jumlah) as total
@@ -592,7 +589,7 @@ def profil():
         return redirect(url_for('index'))
 
     user_id = session['user_id']
-    cursor = mysql.connection.cursor(MySQLdb.cursors.DictCursor)
+    cursor = mysql.connection.cursor(pymysql.cursors.DictCursor)
 
     cursor.execute('SELECT * FROM users WHERE id = %s', (user_id,))
     user = cursor.fetchone()
@@ -625,7 +622,7 @@ def update_profil():
 
     user_id = session['user_id']
     jenis = request.form['jenis']
-    cursor = mysql.connection.cursor(MySQLdb.cursors.DictCursor)
+    cursor = mysql.connection.cursor(pymysql.cursors.DictCursor)
 
     if jenis == 'profil':
         nama = request.form['nama']
@@ -697,7 +694,7 @@ def notifikasi():
 def baca_semua_notifikasi():
     if 'user_id' not in session:
         return redirect(url_for('index'))
-    cursor = mysql.connection.cursor(MySQLdb.cursors.DictCursor)
+    cursor = mysql.connection.cursor(pymysql.cursors.DictCursor)
     cursor.execute('''
         UPDATE notifikasi SET sudah_dibaca = 1
         WHERE user_id = %s
@@ -712,7 +709,7 @@ def kirim_reminder():
         return redirect(url_for('index'))
 
     user_id = session['user_id']
-    cursor = mysql.connection.cursor(MySQLdb.cursors.DictCursor)
+    cursor = mysql.connection.cursor(pymysql.cursors.DictCursor)
     cursor.execute('SELECT * FROM users WHERE id = %s', (user_id,))
     user = cursor.fetchone()
 
@@ -752,7 +749,7 @@ def tantangan():
         return redirect(url_for('index'))
 
     user_id = session['user_id']
-    cursor = mysql.connection.cursor(MySQLdb.cursors.DictCursor)
+    cursor = mysql.connection.cursor(pymysql.cursors.DictCursor)
     from datetime import date, timedelta
 
     cursor.execute('''
@@ -876,7 +873,7 @@ def buat_tantangan():
     tanggal_mulai = date.today()
     tanggal_selesai = tanggal_mulai + timedelta(days=durasi - 1)
 
-    cursor = mysql.connection.cursor(MySQLdb.cursors.DictCursor)
+    cursor = mysql.connection.cursor(pymysql.cursors.DictCursor)
     cursor.execute('''
         INSERT INTO challenges
         (user_id, category_id, nama_tantangan, target_harian,
@@ -900,7 +897,7 @@ def family():
         return redirect(url_for('index'))
 
     user_id = session['user_id']
-    cursor = mysql.connection.cursor(MySQLdb.cursors.DictCursor)
+    cursor = mysql.connection.cursor(pymysql.cursors.DictCursor)
 
     cursor.execute('SELECT * FROM family_links WHERE mahasiswa_id = %s LIMIT 1',
                    (user_id,))
@@ -943,7 +940,7 @@ def hubungkan_family():
 
     orangtua_id = session['user_id']
     kode = request.form['kode_undangan'].upper().strip()
-    cursor = mysql.connection.cursor(MySQLdb.cursors.DictCursor)
+    cursor = mysql.connection.cursor(pymysql.cursors.DictCursor)
 
     # Cari kode undangan
     cursor.execute('''
@@ -972,7 +969,7 @@ def dashboard_orangtua():
         return redirect(url_for('index'))
 
     orangtua_id = session['user_id']
-    cursor = mysql.connection.cursor(MySQLdb.cursors.DictCursor)
+    cursor = mysql.connection.cursor(pymysql.cursors.DictCursor)
 
     cursor.execute('''
         SELECT u.id, u.nama_lengkap, u.universitas
