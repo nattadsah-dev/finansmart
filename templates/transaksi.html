@@ -1,0 +1,252 @@
+{% extends 'base.html' %}
+
+{% block title %}FinanSmart — Transaksi{% endblock %}
+
+{% block content %}
+
+<div class="d-flex justify-content-between align-items-center mb-4">
+    <div>
+        <h4 class="fw-bold mb-0">Transaksi</h4>
+        <p class="text-muted small mb-0">Catat dan kelola transaksi keuanganmu</p>
+    </div>
+</div>
+
+<div class="row g-4">
+
+    <div class="col-md-4">
+        <div class="card border-0 shadow-sm rounded-4">
+            <div class="card-body p-4">
+                <h6 class="fw-bold mb-3">
+                    <i class="bi bi-plus-circle"></i> Catat Transaksi Baru
+                </h6>
+
+                {% if error %}
+                <div class="alert alert-danger alert-dismissible fade show" role="alert">
+                    <i class="bi bi-exclamation-circle"></i> {{ error }}
+                    <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
+                </div>
+                {% endif %}
+
+                {% if success %}
+                <div class="alert alert-success alert-dismissible fade show" role="alert">
+                    <i class="bi bi-check-circle"></i> {{ success }}
+                    <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
+                </div>
+                {% endif %}
+
+                <ul class="nav nav-pills mb-3" id="transaksiTab">
+                    <li class="nav-item flex-fill text-center">
+                        <button class="nav-link active w-100" id="tab-keluar"
+                                onclick="switchTab('pengeluaran')">
+                            <i class="bi bi-arrow-up-circle"></i> Pengeluaran
+                        </button>
+                    </li>
+                    <li class="nav-item flex-fill text-center">
+                        <button class="nav-link w-100" id="tab-masuk"
+                                onclick="switchTab('pemasukan')">
+                            <i class="bi bi-arrow-down-circle"></i> Pemasukan
+                        </button>
+                    </li>
+                </ul>
+
+                <form method="POST" action="/transaksi/tambah" id="form-pengeluaran">
+                    <input type="hidden" name="jenis" value="pengeluaran">
+
+                    <div class="mb-3">
+                        <label class="form-label fw-semibold">Jumlah (Rp)</label>
+                        <div class="input-group">
+                            <span class="input-group-text bg-light">Rp</span>
+                            <input type="number" name="jumlah" class="form-control"
+                                   placeholder="Contoh: 25000" min="1" required>
+                        </div>
+                    </div>
+
+                    <div class="mb-3">
+                        <label class="form-label fw-semibold">Kategori</label>
+                        <select name="category_id" class="form-select" required>
+                            <option value="">-- Pilih Kategori --</option>
+                            {% for k in kategori %}
+                            <option value="{{ k.id }}">{{ k.ikon }} {{ k.nama }}</option>
+                            {% endfor %}
+                        </select>
+                    </div>
+
+                    <div class="mb-3">
+                        <label class="form-label fw-semibold">Tanggal</label>
+                        <input type="date" name="tanggal" class="form-control" required>
+                    </div>
+
+                    <div class="mb-3">
+                        <label class="form-label fw-semibold">
+                            Keterangan
+                            <span class="text-muted fw-normal">(opsional)</span>
+                        </label>
+                        <input type="text" name="keterangan" class="form-control"
+                               placeholder="Contoh: Makan siang di kantin">
+                    </div>
+
+                    <div class="d-grid">
+                        <button type="submit" class="btn btn-danger">
+                            <i class="bi bi-save"></i> Simpan Pengeluaran
+                        </button>
+                    </div>
+                </form>
+
+                <form method="POST" action="/transaksi/tambah" 
+                      id="form-pemasukan" style="display:none;">
+                    <input type="hidden" name="jenis" value="pemasukan">
+
+                    <div class="mb-3">
+                        <label class="form-label fw-semibold">Jumlah (Rp)</label>
+                        <div class="input-group">
+                            <span class="input-group-text bg-light">Rp</span>
+                            <input type="number" name="jumlah" class="form-control"
+                                   placeholder="Contoh: 500000" min="1" required>
+                        </div>
+                    </div>
+
+                    <div class="mb-3">
+                        <label class="form-label fw-semibold">Sumber</label>
+                        <input type="text" name="sumber" class="form-control"
+                               placeholder="Contoh: Uang saku, Beasiswa, Part-time">
+                    </div>
+
+                    <div class="mb-3">
+                        <label class="form-label fw-semibold">Tanggal</label>
+                        <input type="date" name="tanggal" class="form-control" required>
+                    </div>
+
+                    <div class="mb-3">
+                        <label class="form-label fw-semibold">
+                            Keterangan
+                            <span class="text-muted fw-normal">(opsional)</span>
+                        </label>
+                        <input type="text" name="keterangan" class="form-control"
+                               placeholder="Contoh: Uang saku bulan Maret">
+                    </div>
+
+                    <div class="d-grid">
+                        <button type="submit" class="btn btn-success">
+                            <i class="bi bi-save"></i> Simpan Pemasukan
+                        </button>
+                    </div>
+                </form>
+
+            </div>
+        </div>
+    </div>
+
+    <div class="col-md-8">
+        <div class="card border-0 shadow-sm rounded-4">
+            <div class="card-body p-4">
+                <div class="d-flex justify-content-between align-items-center mb-3">
+    <h6 class="fw-bold mb-0">
+        <i class="bi bi-clock-history"></i> Riwayat Transaksi
+    </h6>
+
+    <form method="GET" action="/transaksi" class="d-flex gap-2 align-items-center">
+        <select name="bulan" class="form-select form-select-sm" 
+                style="width: auto;" onchange="this.form.submit()">
+            {% for b in bulan_list %}
+            <option value="{{ b.num }}" 
+                    {{ 'selected' if b.num == bulan_aktif }}>
+                {{ b.nama }}
+            </option>
+            {% endfor %}
+        </select>
+        <select name="tahun" class="form-select form-select-sm" 
+                style="width: auto;" onchange="this.form.submit()">
+            {% for t in tahun_list %}
+            <option value="{{ t }}" 
+                    {{ 'selected' if t == tahun_aktif }}>
+                {{ t }}
+            </option>
+            {% endfor %}
+        </select>
+    </form>
+</div>
+
+                {% if riwayat %}
+                <div class="table-responsive">
+                    <table class="table table-hover align-middle mb-0">
+                        <thead class="table-light">
+                            <tr>
+                                <th>Tanggal</th>
+                                <th>Jenis</th>
+                                <th>Keterangan</th>
+                                <th>Kategori</th>
+                                <th class="text-end">Jumlah</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            {% for t in riwayat %}
+                            <tr>
+                                <td class="text-muted small">{{ t.tanggal }}</td>
+                                <td>
+                                    {% if t.jenis == 'pengeluaran' %}
+                                    <span class="badge bg-danger-subtle text-danger">
+                                        <i class="bi bi-arrow-up"></i> Keluar
+                                    </span>
+                                    {% else %}
+                                    <span class="badge bg-success-subtle text-success">
+                                        <i class="bi bi-arrow-down"></i> Masuk
+                                    </span>
+                                    {% endif %}
+                                </td>
+                                <td>{{ t.keterangan or '-' }}</td>
+                                <td>
+                                    <span class="badge bg-light text-dark">
+                                        {{ t.kategori or '-' }}
+                                    </span>
+                                </td>
+                                <td class="text-end fw-semibold 
+                                    {{ 'amount-out' if t.jenis == 'pengeluaran' else 'amount-in' }}">
+                                    {{ '-' if t.jenis == 'pengeluaran' else '+' }}
+                                    Rp {{ "{:,.0f}".format(t.jumlah) }}
+                                </td>
+                            </tr>
+                            {% endfor %}
+                        </tbody>
+                    </table>
+                </div>
+                {% else %}
+                <div class="empty-state">
+                    <i class="bi bi-inbox display-4 text-muted"></i>
+                    <p class="mt-2">Belum ada transaksi yang dicatat.</p>
+                </div>
+                {% endif %}
+
+            </div>
+        </div>
+    </div>
+
+</div>
+
+{% endblock %}
+
+{% block extra_js %}
+<script>
+    function switchTab(jenis) {
+        const tabKeluar = document.getElementById('tab-keluar');
+        const tabMasuk  = document.getElementById('tab-masuk');
+        const formKeluar = document.getElementById('form-pengeluaran');
+        const formMasuk  = document.getElementById('form-pemasukan');
+
+        if (jenis === 'pengeluaran') {
+            tabKeluar.classList.add('active');
+            tabMasuk.classList.remove('active');
+            formKeluar.style.display = 'block';
+            formMasuk.style.display  = 'none';
+        } else {
+            tabMasuk.classList.add('active');
+            tabKeluar.classList.remove('active');
+            formMasuk.style.display  = 'block';
+            formKeluar.style.display = 'none';
+        }
+    }
+
+    document.querySelectorAll('input[type="date"]').forEach(input => {
+        input.valueAsDate = new Date();
+    });
+</script>
+{% endblock %}

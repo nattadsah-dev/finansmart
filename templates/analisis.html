@@ -1,0 +1,155 @@
+{% extends 'base.html' %}
+
+{% block title %}FinanSmart — Analisis{% endblock %}
+
+{% block extra_head %}
+<script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+{% endblock %}
+
+{% block content %}
+
+<!-- Header -->
+<div class="d-flex justify-content-between align-items-center mb-4">
+    <div>
+        <h4 class="fw-bold mb-0">Analisis Keuangan</h4>
+        <p class="text-muted small mb-0">Pola pengeluaran dan kesehatan finansialmu bulan ini</p>
+    </div>
+</div>
+
+<!-- Kartu ringkasan -->
+<div class="row g-3 mb-4">
+    <div class="col-md-4">
+        <div class="card border-0 shadow-sm rounded-4 stat-card green h-100">
+            <div class="card-body">
+                <div class="stat-label">
+                    <i class="bi bi-calendar-day text-success"></i> Rata-rata Pengeluaran/Hari
+                </div>
+                <div class="stat-value text-success mt-1">
+                    Rp {{ "{:,.0f}".format(rata_harian) }}
+                </div>
+            </div>
+        </div>
+    </div>
+    <div class="col-md-4">
+        <div class="card border-0 shadow-sm rounded-4 stat-card blue h-100">
+            <div class="card-body">
+                <div class="stat-label">
+                    <i class="bi bi-piggy-bank text-primary"></i> Persentase Tabungan
+                </div>
+                <div class="stat-value text-primary mt-1">{{ persen_tabungan }}%</div>
+                <div class="progress mt-2" style="height: 6px;">
+                    <div class="progress-bar bg-primary"
+                         style="width: {{ [persen_tabungan, 100] | min }}%"></div>
+                </div>
+            </div>
+        </div>
+    </div>
+    <div class="col-md-4">
+        <div class="card border-0 shadow-sm rounded-4 stat-card gold h-100">
+            <div class="card-body">
+                <div class="stat-label">
+                    <i class="bi bi-trophy text-warning"></i> Kategori Terbesar
+                </div>
+                <div class="stat-value mt-1" style="font-size:18px;">
+                    {{ kategori_terbesar }}
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Pie Chart -->
+<div class="row g-4">
+    <div class="col-md-7">
+        <div class="card border-0 shadow-sm rounded-4 h-100">
+            <div class="card-body p-4">
+                <h6 class="fw-bold mb-3">
+                    <i class="bi bi-pie-chart"></i> Distribusi Pengeluaran Bulan Ini
+                </h6>
+                {% if pie_labels %}
+                <canvas id="pieChart"></canvas>
+                {% else %}
+                <div class="empty-state">
+                    <i class="bi bi-inbox display-4 text-muted"></i>
+                    <p class="mt-2">Belum ada data pengeluaran bulan ini.</p>
+                </div>
+                {% endif %}
+            </div>
+        </div>
+    </div>
+
+    <!-- Detail per kategori -->
+    <div class="col-md-5">
+        <div class="card border-0 shadow-sm rounded-4 h-100">
+            <div class="card-body p-4">
+                <h6 class="fw-bold mb-3">
+                    <i class="bi bi-list-ul"></i> Detail per Kategori
+                </h6>
+                {% if pie_labels %}
+                <div class="d-flex flex-column gap-2">
+                    {% for i in range(pie_labels|length) %}
+                    <div class="d-flex justify-content-between align-items-center
+                                p-2 rounded-3" style="background:#f8f9fa;">
+                        <span class="small fw-semibold">{{ pie_labels[i] }}</span>
+                        <span class="badge bg-success-subtle text-success">
+                            Rp {{ "{:,.0f}".format(pie_data[i]) }}
+                        </span>
+                    </div>
+                    {% endfor %}
+                </div>
+                {% else %}
+                <div class="empty-state">
+                    <i class="bi bi-inbox display-4 text-muted"></i>
+                    <p class="mt-2">Belum ada data.</p>
+                </div>
+                {% endif %}
+            </div>
+        </div>
+    </div>
+</div>
+
+{% endblock %}
+
+{% block extra_js %}
+<script>
+{% if pie_labels %}
+new Chart(document.getElementById('pieChart'), {
+    type: 'doughnut',
+    data: {
+        labels: {{ pie_labels | tojson }},
+        datasets: [{
+            data: {{ pie_data | tojson }},
+            backgroundColor: [
+                '#22a05e','#3b82f6','#f59e0b','#ef4444',
+                '#8b5cf6','#f97316','#06b6d4','#84cc16'
+            ],
+            borderWidth: 3,
+            borderColor: '#fff'
+        }]
+    },
+    options: {
+        responsive: true,
+        cutout: '65%',
+        plugins: {
+            legend: {
+                position: 'bottom',
+                labels: {
+                    padding: 16,
+                    font: { size: 12 }
+                }
+            },
+            tooltip: {
+                callbacks: {
+                    label: function(context) {
+                        const total = context.dataset.data.reduce((a, b) => a + b, 0);
+                        const persen = ((context.parsed / total) * 100).toFixed(1);
+                        return ` ${context.label}: Rp ${context.parsed.toLocaleString('id-ID')} (${persen}%)`;
+                    }
+                }
+            }
+        }
+    }
+});
+{% endif %}
+</script>
+{% endblock %}

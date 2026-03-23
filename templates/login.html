@@ -1,0 +1,66 @@
+{% extends 'base.html' %}
+
+{% block title %}FinanSmart — Login{% endblock %}
+
+{% block navbar %}{% endblock %}
+
+{% block content %}
+<div class="min-vh-100 d-flex align-items-center justify-content-center">
+    <div class="card shadow border-0 rounded-4" style="width: 100%; max-width: 420px;">
+        <div class="card-body p-4">
+
+            <div class="text-center mb-4">
+                <h2 class="fw-bold text-success">
+                    <i class="bi bi-wallet2"></i> FinanSmart
+                </h2>
+                <p class="text-muted">Masuk ke akun kamu</p>
+            </div>
+
+            {% if error %}
+            <div class="alert alert-danger alert-dismissible fade show" role="alert">
+                <i class="bi bi-exclamation-circle"></i> {{ error }}
+                <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
+            </div>
+            {% endif %}
+
+            <form method="POST" action="/">
+                <div class="mb-3">
+                    <label class="form-label fw-semibold">Email</label>
+                    <div class="input-group">
+                        <span class="input-group-text bg-light">
+                            <i class="bi bi-envelope"></i>
+                        </span>
+                        <input type="email" name="email" class="form-control" 
+                               placeholder="Masukkan email kamu" required>
+                    </div>
+                </div>
+
+                <div class="mb-3">
+                    <label class="form-label fw-semibold">Kata Sandi</label>
+                    <div class="input-group">
+                        <span class="input-group-text bg-light">
+                            <i class="bi bi-lock"></i>
+                        </span>
+                        <input type="password" name="password" class="form-control" 
+                               placeholder="Masukkan kata sandi" required>
+                    </div>
+                </div>
+
+                <div class="d-grid mt-4">
+                    <button type="submit" class="btn btn-success btn-lg">
+                        <i class="bi bi-box-arrow-in-right"></i> Masuk
+                    </button>
+                </div>
+            </form>
+
+            <hr class="my-4">
+
+            <p class="text-center text-muted mb-0">
+                Belum punya akun? 
+                <a href="/register" class="text-success fw-semibold">Daftar di sini</a>
+            </p>
+
+        </div>
+    </div>
+</div>
+{% endblock %}

@@ -1,0 +1,217 @@
+{% extends 'base.html' %}
+
+{% block title %}FinanSmart — Family Link{% endblock %}
+
+{% block content %}
+
+<div class="d-flex justify-content-between align-items-center mb-4">
+    <div>
+        <h4 class="fw-bold mb-0">Family Link</h4>
+        <p class="text-muted small mb-0">Hubungkan akun dengan orang tua</p>
+    </div>
+</div>
+
+{% if success %}
+<div class="alert alert-success alert-dismissible fade show">
+    <i class="bi bi-check-circle"></i> {{ success }}
+    <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
+</div>
+{% endif %}
+
+{% if error %}
+<div class="alert alert-danger alert-dismissible fade show">
+    <i class="bi bi-exclamation-circle"></i> {{ error }}
+    <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
+</div>
+{% endif %}
+
+<div class="row g-4">
+
+    <div class="col-md-5">
+        <div class="card border-0 shadow-sm rounded-4 h-100">
+            <div class="card-body p-4">
+                <h6 class="fw-bold mb-1">
+                    <i class="bi bi-link-45deg text-success"></i> Kode Undangan
+                </h6>
+                <p class="text-muted small mb-3">
+                    Bagikan kode ini kepada orang tua kamu untuk menghubungkan akun.
+                </p>
+
+                <div class="text-center p-4 rounded-3 mb-3"
+                     style="background: #f0faf5; border: 2px dashed #22a05e;">
+                    <div class="text-muted small mb-1">Kode Undanganmu</div>
+                    <div class="fw-bold fs-2 text-success letter-spacing-3">
+                        {{ kode_undangan }}
+                    </div>
+                    <div class="text-muted small mt-1">
+                        Berlaku selama akun aktif
+                    </div>
+                </div>
+
+                <div class="d-grid">
+                    <button class="btn btn-outline-success btn-sm"
+                            onclick="copyKode('{{ kode_undangan }}')">
+                        <i class="bi bi-clipboard"></i> Salin Kode
+                    </button>
+                </div>
+
+                <hr>
+
+                <h6 class="fw-bold mb-3">
+                    <i class="bi bi-people"></i> Status Koneksi
+                </h6>
+
+                {% if orangtua_terhubung %}
+                    {% for ot in orangtua_terhubung %}
+                    <div class="d-flex align-items-center gap-3 p-3 rounded-3 mb-2"
+                         style="background: #f0faf5;">
+                        <div class="rounded-circle bg-success d-flex align-items-center
+                                    justify-content-center text-white fw-bold"
+                             style="width:40px; height:40px; flex-shrink:0;">
+                            {{ ot.nama_lengkap[0].upper() }}
+                        </div>
+                        <div class="flex-grow-1">
+                            <div class="fw-semibold small">{{ ot.nama_lengkap }}</div>
+                            <div class="text-muted" style="font-size:11px;">
+                                {{ ot.email }}
+                            </div>
+                        </div>
+                        <span class="badge bg-success-subtle text-success">
+                            Terhubung
+                        </span>
+                    </div>
+                    {% endfor %}
+                {% else %}
+                <div class="text-center text-muted py-3">
+                    <i class="bi bi-person-x display-6"></i>
+                    <p class="small mt-2">Belum ada orang tua yang terhubung.</p>
+                </div>
+                {% endif %}
+
+            </div>
+        </div>
+    </div>
+
+    <div class="col-md-7">
+        <div class="card border-0 shadow-sm rounded-4 mb-4">
+            <div class="card-body p-4">
+                <h6 class="fw-bold mb-3">
+                    <i class="bi bi-question-circle"></i> Cara Menghubungkan Akun
+                </h6>
+                <div class="d-flex flex-column gap-3">
+                    <div class="d-flex gap-3">
+                        <div class="rounded-circle bg-success text-white d-flex
+                                    align-items-center justify-content-center fw-bold"
+                             style="width:32px; height:32px; flex-shrink:0;">1</div>
+                        <div>
+                            <div class="fw-semibold small">Bagikan kode undangan</div>
+                            <div class="text-muted" style="font-size:12px;">
+                                Salin kode undanganmu dan kirim ke orang tua via WhatsApp atau pesan lainnya.
+                            </div>
+                        </div>
+                    </div>
+                    <div class="d-flex gap-3">
+                        <div class="rounded-circle bg-success text-white d-flex
+                                    align-items-center justify-content-center fw-bold"
+                             style="width:32px; height:32px; flex-shrink:0;">2</div>
+                        <div>
+                            <div class="fw-semibold small">Orang tua daftar akun</div>
+                            <div class="text-muted" style="font-size:12px;">
+                                Orang tua membuat akun baru di FinanSmart dengan memilih role "Orang Tua".
+                            </div>
+                        </div>
+                    </div>
+                    <div class="d-flex gap-3">
+                        <div class="rounded-circle bg-success text-white d-flex
+                                    align-items-center justify-content-center fw-bold"
+                             style="width:32px; height:32px; flex-shrink:0;">3</div>
+                        <div>
+                            <div class="fw-semibold small">Masukkan kode undangan</div>
+                            <div class="text-muted" style="font-size:12px;">
+                                Setelah login, orang tua memasukkan kode undangan untuk terhubung dengan akunmu.
+                            </div>
+                        </div>
+                    </div>
+                    <div class="d-flex gap-3">
+                        <div class="rounded-circle bg-success text-white d-flex
+                                    align-items-center justify-content-center fw-bold"
+                             style="width:32px; height:32px; flex-shrink:0;">4</div>
+                        <div>
+                            <div class="fw-semibold small">Akun terhubung!</div>
+                            <div class="text-muted" style="font-size:12px;">
+                                Orang tua bisa memantau ringkasan keuanganmu secara real-time.
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <div class="card border-0 shadow-sm rounded-4">
+            <div class="card-body p-4">
+                <h6 class="fw-bold mb-3">
+                    <i class="bi bi-shield-check text-success"></i> Yang Bisa Dilihat Orang Tua
+                </h6>
+                <div class="row g-2">
+                    <div class="col-6">
+                        <div class="d-flex gap-2 align-items-center">
+                            <i class="bi bi-check-circle-fill text-success"></i>
+                            <span class="small">Total pemasukan & pengeluaran</span>
+                        </div>
+                    </div>
+                    <div class="col-6">
+                        <div class="d-flex gap-2 align-items-center">
+                            <i class="bi bi-check-circle-fill text-success"></i>
+                            <span class="small">Financial Health Score</span>
+                        </div>
+                    </div>
+                    <div class="col-6">
+                        <div class="d-flex gap-2 align-items-center">
+                            <i class="bi bi-check-circle-fill text-success"></i>
+                            <span class="small">Grafik distribusi pengeluaran</span>
+                        </div>
+                    </div>
+                    <div class="col-6">
+                        <div class="d-flex gap-2 align-items-center">
+                            <i class="bi bi-check-circle-fill text-success"></i>
+                            <span class="small">Status tantangan hemat</span>
+                        </div>
+                    </div>
+                    <div class="col-6">
+                        <div class="d-flex gap-2 align-items-center">
+                            <i class="bi bi-x-circle-fill text-danger"></i>
+                            <span class="small">Detail tiap transaksi</span>
+                        </div>
+                    </div>
+                    <div class="col-6">
+                        <div class="d-flex gap-2 align-items-center">
+                            <i class="bi bi-x-circle-fill text-danger"></i>
+                            <span class="small">Keterangan transaksi</span>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+</div>
+
+{% endblock %}
+
+{% block extra_js %}
+<script>
+function copyKode(kode) {
+    navigator.clipboard.writeText(kode).then(() => {
+        const btn = document.querySelector('[onclick*="copyKode"]');
+        btn.innerHTML = '<i class="bi bi-check"></i> Tersalin!';
+        btn.classList.remove('btn-outline-success');
+        btn.classList.add('btn-success');
+        setTimeout(() => {
+            btn.innerHTML = '<i class="bi bi-clipboard"></i> Salin Kode';
+            btn.classList.remove('btn-success');
+            btn.classList.add('btn-outline-success');
+        }, 2000);
+    });
+}
+</script>
+{% endblock %}

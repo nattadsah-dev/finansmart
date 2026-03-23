@@ -1,0 +1,183 @@
+{% extends 'base.html' %}
+
+{% block title %}FinanSmart — Dashboard{% endblock %}
+
+{% block content %}
+
+<div id="reminder-banner" class="alert alert-info alert-dismissible fade show d-none" role="alert">
+    <i class="bi bi-envelope"></i> <span id="reminder-pesan"></span>
+    <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
+</div>
+
+<div class="d-flex justify-content-between align-items-center mb-4">
+    <div>
+        <h4 class="fw-bold mb-0">Dashboard</h4>
+        <p class="text-muted small mb-0">Ringkasan keuangan bulan ini</p>
+    </div>
+    <div class="d-flex gap-2">
+        <button class="btn btn-outline-success" onclick="kirimReminder()">
+            <i class="bi bi-bell"></i> Test Reminder Email
+        </button>
+        <a href="/transaksi" class="btn btn-success">
+            <i class="bi bi-plus-circle"></i> Catat Transaksi
+        </a>
+    </div>
+</div>
+
+<div class="row g-3 mb-4">
+    <div class="col-md-3">
+        <div class="card border-0 shadow-sm rounded-4 stat-card green h-100">
+            <div class="card-body">
+                <div class="stat-label">
+                    <i class="bi bi-arrow-down-circle text-success"></i> Total Pemasukan
+                </div>
+                <div class="stat-value text-success mt-1">
+                    Rp {{ "{:,.0f}".format(total_pemasukan) }}
+                </div>
+            </div>
+        </div>
+    </div>
+
+<div class="col-md-12">
+    <div class="card border-0 shadow-sm rounded-4">
+        <div class="card-body d-flex align-items-center gap-3 py-3">
+            <div class="fs-1"></div>
+            <div>
+                <div class="stat-label">Jejak Finansial</div>
+                <div class="fw-bold fs-5">
+                    {% if jejak == 0 %}
+                        Belum ada catatan hari ini
+                    {% elif jejak == 1 %}
+                        1 hari mencatat — semangat terus!
+                    {% else %}
+                        {{ jejak }} hari berturut-turut mencatat!
+                    {% endif %}
+                </div>
+            </div>
+            {% if jejak >= 7 %}
+            <span class="badge bg-success ms-auto px-3 py-2">
+                 {{ jejak }} Hari Streak!
+            </span>
+            {% endif %}
+        </div>
+    </div>
+</div>
+    <div class="col-md-3">
+        <div class="card border-0 shadow-sm rounded-4 stat-card red h-100">
+            <div class="card-body">
+                <div class="stat-label">
+                    <i class="bi bi-arrow-up-circle text-danger"></i> Total Pengeluaran
+                </div>
+                <div class="stat-value text-danger mt-1">
+                    Rp {{ "{:,.0f}".format(total_pengeluaran) }}
+                </div>
+            </div>
+        </div>
+    </div>
+    <div class="col-md-3">
+        <div class="card border-0 shadow-sm rounded-4 stat-card blue h-100">
+            <div class="card-body">
+                <div class="stat-label">
+                    <i class="bi bi-wallet text-primary"></i> Saldo Bulan Ini
+                </div>
+                <div class="stat-value text-primary mt-1">
+                    Rp {{ "{:,.0f}".format(saldo) }}
+                </div>
+            </div>
+        </div>
+    </div>
+    <div class="col-md-3">
+        <div class="card border-0 shadow-sm rounded-4 stat-card gold h-100">
+            <div class="card-body">
+                <div class="stat-label">
+                    <i class="bi bi-heart-pulse text-warning"></i> Financial Health Score
+                </div>
+                <div class="stat-value text-warning mt-1">{{ fhs }} / 100</div>
+                <div class="progress mt-2" style="height: 6px;">
+                    <div class="progress-bar bg-warning" style="width: {{ fhs }}%"></div>
+                </div>
+                <small class="text-muted">
+                    {% if fhs >= 80 %}Sangat Sehat 🟢
+                    {% elif fhs >= 60 %}Sehat 🟡
+                    {% elif fhs >= 40 %}Cukup 🟠
+                    {% else %}Perlu Perhatian 🔴
+                    {% endif %}
+                </small>
+            </div>
+        </div>
+    </div>
+</div>
+
+<div class="card border-0 shadow-sm rounded-4">
+    <div class="card-body">
+        <div class="d-flex justify-content-between align-items-center mb-3">
+            <h6 class="fw-bold mb-0">
+                <i class="bi bi-clock-history"></i> Transaksi Terakhir
+            </h6>
+            <a href="/transaksi" class="btn btn-outline-success btn-sm">Lihat Semua</a>
+        </div>
+
+        {% if transaksi %}
+        <div class="table-responsive">
+            <table class="table table-hover align-middle mb-0">
+                <thead class="table-light">
+                    <tr>
+                        <th>Tanggal</th>
+                        <th>Keterangan</th>
+                        <th>Kategori</th>
+                        <th class="text-end">Jumlah</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for t in transaksi %}
+                    <tr>
+                        <td class="text-muted small">{{ t.tanggal }}</td>
+                        <td>{{ t.keterangan or '-' }}</td>
+                        <td>
+                            <span class="badge bg-light text-dark">
+                                {{ t.kategori or '-' }}
+                            </span>
+                        </td>
+                        <td class="text-end amount-out">
+                            - Rp {{ "{:,.0f}".format(t.jumlah) }}
+                        </td>
+                    </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+        {% else %}
+        <div class="empty-state">
+            <i class="bi bi-inbox display-4 text-muted"></i>
+            <p class="mt-2">Belum ada transaksi.</p>
+            <a href="/transaksi" class="btn btn-success btn-sm">
+                <i class="bi bi-plus"></i> Catat Sekarang
+            </a>
+        </div>
+        {% endif %}
+
+    </div>
+</div>
+
+{% block extra_js %}
+<script>
+function kirimReminder() {
+    fetch('/kirim-reminder')
+        .then(res => res.json())
+        .then(data => {
+            const banner = document.getElementById('reminder-banner');
+            const pesan = document.getElementById('reminder-pesan');
+            pesan.textContent = data.pesan;
+            banner.classList.remove('d-none');
+            if (data.status === 'ok') {
+                banner.className = 'alert alert-success alert-dismissible fade show';
+            } else if (data.status === 'skip') {
+                banner.className = 'alert alert-info alert-dismissible fade show';
+            } else {
+                banner.className = 'alert alert-danger alert-dismissible fade show';
+            }
+        });
+}
+</script>
+{% endblock %}
+{% endblock %}

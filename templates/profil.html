@@ -1,0 +1,228 @@
+{% extends 'base.html' %}
+
+{% block title %}FinanSmart — Profil{% endblock %}
+
+{% block content %}
+
+<!-- Header -->
+<div class="d-flex justify-content-between align-items-center mb-4">
+    <div>
+        <h4 class="fw-bold mb-0">Profil & Pengaturan</h4>
+        <p class="text-muted small mb-0">Kelola informasi dan anggaran bulananmu</p>
+    </div>
+</div>
+
+{% if success %}
+<div class="alert alert-success alert-dismissible fade show" role="alert">
+    <i class="bi bi-check-circle"></i> {{ success }}
+    <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
+</div>
+{% endif %}
+
+{% if error %}
+<div class="alert alert-danger alert-dismissible fade show" role="alert">
+    <i class="bi bi-exclamation-circle"></i> {{ error }}
+    <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
+</div>
+{% endif %}
+
+<div class="row g-4">
+
+    <div class="col-md-4">
+        <div class="card border-0 shadow-sm rounded-4">
+            <div class="card-body p-4 text-center">
+
+                <div class="mb-3">
+                    <div class="rounded-circle bg-success d-inline-flex align-items-center 
+                                justify-content-center text-white fw-bold"
+                         style="width:80px; height:80px; font-size:32px;">
+                        {{ user.nama_lengkap[0].upper() }}
+                    </div>
+                </div>
+
+                <h5 class="fw-bold mb-0">{{ user.nama_lengkap }}</h5>
+                <p class="text-muted small">{{ user.email }}</p>
+                {% if user.universitas %}
+                <span class="badge bg-success-subtle text-success">
+                    <i class="bi bi-building"></i> {{ user.universitas }}
+                </span>
+                {% endif %}
+
+                <hr>
+
+                <div class="row text-center g-2">
+                    <div class="col-6">
+                        <div class="fw-bold text-success">{{ total_transaksi }}</div>
+                        <div class="text-muted" style="font-size:12px;">Total Transaksi</div>
+                    </div>
+                    <div class="col-6">
+                        <div class="fw-bold text-primary">{{ hari_bergabung }}</div>
+                        <div class="text-muted" style="font-size:12px;">Hari Bergabung</div>
+                    </div>
+                </div>
+
+            </div>
+        </div>
+    </div>
+
+    <div class="col-md-8">
+
+        <div class="card border-0 shadow-sm rounded-4 mb-4">
+            <div class="card-body p-4">
+                <h6 class="fw-bold mb-3">
+                    <i class="bi bi-person"></i> Informasi Pribadi
+                </h6>
+
+                <form method="POST" action="/profil/update">
+                    <input type="hidden" name="jenis" value="profil">
+
+                    <div class="row g-3">
+                        <div class="col-md-6">
+                            <label class="form-label fw-semibold">Nama Lengkap</label>
+                            <input type="text" name="nama" class="form-control"
+                                   value="{{ user.nama_lengkap }}" required>
+                        </div>
+                        <div class="col-md-6">
+                            <label class="form-label fw-semibold">Email</label>
+                            <input type="email" class="form-control"
+                                   value="{{ user.email }}" disabled>
+                            <div class="form-text">Email tidak dapat diubah.</div>
+                        </div>
+                        <div class="col-md-12">
+                            <label class="form-label fw-semibold">Universitas</label>
+                            <input type="text" name="universitas" class="form-control"
+                                   value="{{ user.universitas or '' }}"
+                                   placeholder="Nama universitas kamu">
+                        </div>
+                        <div class="col-md-6">
+                            <label class="form-label fw-semibold">Password Baru</label>
+                            <input type="password" name="password_baru" class="form-control"
+                                   placeholder="Kosongkan jika tidak ingin ubah">
+                        </div>
+                        <div class="col-md-6">
+                            <label class="form-label fw-semibold">Konfirmasi Password</label>
+                            <input type="password" name="konfirmasi_password" class="form-control"
+                                   placeholder="Ulangi password baru">
+                        </div>
+                    </div>
+
+                    <div class="mt-3">
+                        <button type="submit" class="btn btn-success">
+                            <i class="bi bi-save"></i> Simpan Perubahan
+                        </button>
+                    </div>
+                </form>
+
+            </div>
+        </div>
+
+        <div class="card border-0 shadow-sm rounded-4">
+            <div class="card-body p-4">
+                <h6 class="fw-bold mb-1">
+                    <i class="bi bi-wallet"></i> Anggaran Bulanan per Kategori
+                </h6>
+                <p class="text-muted small mb-3">
+                    Set batas pengeluaran per kategori. Sistem akan memberi peringatan 
+                    jika pengeluaran mendekati atau melebihi batas ini.
+                </p>
+
+                <form method="POST" action="/profil/update">
+                    <input type="hidden" name="jenis" value="anggaran">
+
+                    <div class="row g-3">
+                        <div class="col-md-6">
+                            <label class="form-label fw-semibold">
+                                 Makanan & Minuman
+                            </label>
+                            <div class="input-group">
+                                <span class="input-group-text bg-light">Rp</span>
+                                <input type="number" name="anggaran_makan" class="form-control"
+                                       value="{{ user.anggaran_makan or 0 }}" min="0">
+                            </div>
+                        </div>
+                        <div class="col-md-6">
+                            <label class="form-label fw-semibold">
+                                 Transportasi
+                            </label>
+                            <div class="input-group">
+                                <span class="input-group-text bg-light">Rp</span>
+                                <input type="number" name="anggaran_transportasi" class="form-control"
+                                       value="{{ user.anggaran_transportasi or 0 }}" min="0">
+                            </div>
+                        </div>
+                        <div class="col-md-6">
+                            <label class="form-label fw-semibold">
+                                 Pendidikan
+                            </label>
+                            <div class="input-group">
+                                <span class="input-group-text bg-light">Rp</span>
+                                <input type="number" name="anggaran_pendidikan" class="form-control"
+                                       value="{{ user.anggaran_pendidikan or 0 }}" min="0">
+                            </div>
+                        </div>
+                        <div class="col-md-6">
+                            <label class="form-label fw-semibold">
+                                 Komunikasi
+                            </label>
+                            <div class="input-group">
+                                <span class="input-group-text bg-light">Rp</span>
+                                <input type="number" name="anggaran_komunikasi" class="form-control"
+                                       value="{{ user.anggaran_komunikasi or 0 }}" min="0">
+                            </div>
+                        </div>
+                        <div class="col-md-6">
+                            <label class="form-label fw-semibold">
+                                 Hiburan
+                            </label>
+                            <div class="input-group">
+                                <span class="input-group-text bg-light">Rp</span>
+                                <input type="number" name="anggaran_hiburan" class="form-control"
+                                       value="{{ user.anggaran_hiburan or 0 }}" min="0">
+                            </div>
+                        </div>
+                        <div class="col-md-6">
+                            <label class="form-label fw-semibold">
+                                 Kesehatan
+                            </label>
+                            <div class="input-group">
+                                <span class="input-group-text bg-light">Rp</span>
+                                <input type="number" name="anggaran_kesehatan" class="form-control"
+                                       value="{{ user.anggaran_kesehatan or 0 }}" min="0">
+                            </div>
+                        </div>
+                        <div class="col-md-6">
+                            <label class="form-label fw-semibold">
+                                 Kebutuhan Pribadi
+                            </label>
+                            <div class="input-group">
+                                <span class="input-group-text bg-light">Rp</span>
+                                <input type="number" name="anggaran_pribadi" class="form-control"
+                                       value="{{ user.anggaran_pribadi or 0 }}" min="0">
+                            </div>
+                        </div>
+                        <div class="col-md-6">
+                            <label class="form-label fw-semibold">
+                                 Lain-lain
+                            </label>
+                            <div class="input-group">
+                                <span class="input-group-text bg-light">Rp</span>
+                                <input type="number" name="anggaran_lainnya" class="form-control"
+                                       value="{{ user.anggaran_lainnya or 0 }}" min="0">
+                            </div>
+                        </div>
+                    </div>
+
+                    <div class="mt-3">
+                        <button type="submit" class="btn btn-success">
+                            <i class="bi bi-save"></i> Simpan Anggaran
+                        </button>
+                    </div>
+                </form>
+
+            </div>
+        </div>
+
+    </div>
+</div>
+
+{% endblock %}

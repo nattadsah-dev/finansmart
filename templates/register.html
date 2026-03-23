@@ -1,0 +1,113 @@
+{% extends 'base.html' %}
+
+{% block title %}FinanSmart — Daftar{% endblock %}
+
+{% block navbar %}{% endblock %}
+
+{% block content %}
+<div class="min-vh-100 d-flex align-items-center justify-content-center py-4">
+    <div class="card shadow border-0 rounded-4" style="width: 100%; max-width: 460px;">
+        <div class="card-body p-4">
+
+            <div class="text-center mb-4">
+                <h2 class="fw-bold text-success">
+                    <i class="bi bi-wallet2"></i> FinanSmart
+                </h2>
+                <p class="text-muted">Buat akun baru</p>
+            </div>
+
+            {% if error %}
+            <div class="alert alert-danger alert-dismissible fade show" role="alert">
+                <i class="bi bi-exclamation-circle"></i> {{ error }}
+                <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
+            </div>
+            {% endif %}
+
+            <form method="POST" action="/register">
+                <div class="mb-3">
+                    <label class="form-label fw-semibold">Nama Lengkap</label>
+                    <div class="input-group">
+                        <span class="input-group-text bg-light">
+                            <i class="bi bi-person"></i>
+                        </span>
+                        <input type="text" name="nama" class="form-control" 
+                               placeholder="Nama lengkap kamu" required>
+                    </div>
+                </div>
+
+                <div class="mb-3">
+                    <label class="form-label fw-semibold">Email</label>
+                    <div class="input-group">
+                        <span class="input-group-text bg-light">
+                            <i class="bi bi-envelope"></i>
+                        </span>
+                        <input type="email" name="email" class="form-control" 
+                               placeholder="Masukkan email kamu" required>
+                    </div>
+                </div>
+
+                <div class="mb-3">
+                    <label class="form-label fw-semibold">
+                        Universitas 
+                        <span class="text-muted fw-normal">(opsional)</span>
+                    </label>
+                    <div class="input-group">
+                        <span class="input-group-text bg-light">
+                            <i class="bi bi-building"></i>
+                        </span>
+                        <input type="text" name="universitas" class="form-control" 
+                               placeholder="Nama universitas kamu">
+                    </div>
+                </div>
+
+                <div class="mb-3">
+                    <label class="form-label fw-semibold">Daftar Sebagai</label>
+                    <div class="d-flex gap-3">
+                      <div class="form-check flex-fill border rounded-3 p-3 text-center">
+                     <input class="form-check-input" type="radio"
+                              name="role" value="mahasiswa" id="roleMahasiswa" checked>
+                 <label class="form-check-label d-block" for="roleMahasiswa">
+                             <i class="bi bi-mortarboard-fill text-success fs-4"></i>
+                 <div class="fw-semibold small mt-1">Mahasiswa</div>
+                </label>
+                </div>
+                <div class="form-check flex-fill border rounded-3 p-3 text-center">
+                    <input class="form-check-input" type="radio"
+                            name="role" value="orangtua" id="roleOrangtua">
+                <label class="form-check-label d-block" for="roleOrangtua">
+                            <i class="bi bi-people-fill text-primary fs-4"></i>
+                <div class="fw-semibold small mt-1">Orang Tua</div>
+                        </label>
+                </div>
+                </div>
+                </div>
+
+                <div class="mb-3">
+                    <label class="form-label fw-semibold">Kata Sandi</label>
+                    <div class="input-group">
+                        <span class="input-group-text bg-light">
+                            <i class="bi bi-lock"></i>
+                        </span>
+                        <input type="password" name="password" class="form-control" 
+                               placeholder="Minimal 8 karakter" required>
+                    </div>
+                </div>
+
+                <div class="d-grid mt-4">
+                    <button type="submit" class="btn btn-success btn-lg">
+                        <i class="bi bi-person-plus"></i> Buat Akun
+                    </button>
+                </div>
+            </form>
+
+            <hr class="my-4">
+
+            <p class="text-center text-muted mb-0">
+                Sudah punya akun? 
+                <a href="/" class="text-success fw-semibold">Masuk di sini</a>
+            </p>
+
+        </div>
+    </div>
+</div>
+{% endblock %}
