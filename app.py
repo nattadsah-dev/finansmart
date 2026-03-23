@@ -2,8 +2,10 @@ from os import link
 from tkinter import EXCEPTION
 
 from flask import Flask, render_template, request, redirect, url_for, session, jsonify
+import pymysql
+import pymysql.cursors
+pymysql.install_as_MySQLdb()
 from flask_mysqldb import MySQL
-from flask_mail import Mail, Message
 import MySQLdb.cursors
 import hashlib
 from datetime import datetime
