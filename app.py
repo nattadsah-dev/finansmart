@@ -150,7 +150,7 @@ def kirim_email_reminder(email, nama):
                     Ini adalah pengingat harianmu untuk mencatat transaksi keuangan hari ini.
                 </p>
                 <div style="text-align: center; margin-top: 24px;">
-                    <a href="http://localhost:5000/transaksi"
+                    <a href="https://web-production-355ce.up.railway.app/transaksi"
                        style="background: #1a7a4a; color: white; padding: 12px 28px;
                               border-radius: 8px; text-decoration: none; font-weight: bold;">
                         Catat Transaksi Sekarang
