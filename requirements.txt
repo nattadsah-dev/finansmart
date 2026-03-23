@@ -1,5 +1,5 @@
 flask
-flask-mysqldb
+pymysql
 flask-mail
 pandas
 gunicorn
