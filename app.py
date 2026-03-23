@@ -11,17 +11,22 @@ from datetime import datetime
 app = Flask(__name__)
 app.secret_key = 'finansmart_secret_key'
 
-app.config['MYSQL_HOST'] = 'localhost'
-app.config['MYSQL_USER'] = 'root'
-app.config['MYSQL_PASSWORD'] = ''
-app.config['MYSQL_DB'] = 'finansmart'
+import os
+
+app.config['MYSQL_HOST'] = os.environ.get('MYSQL_HOST', 'localhost')
+app.config['MYSQL_USER'] = os.environ.get('MYSQL_USER', 'root')
+app.config['MYSQL_PASSWORD'] = os.environ.get('MYSQL_PASSWORD', '')
+app.config['MYSQL_DB'] = os.environ.get('MYSQL_DB', 'finansmart')
+app.config['MYSQL_PORT'] = int(os.environ.get('MYSQL_PORT', 3306))
 
 app.config['MAIL_SERVER'] = 'smtp.gmail.com'
 app.config['MAIL_PORT'] = 587
 app.config['MAIL_USE_TLS'] = True
-app.config['MAIL_USERNAME'] = 'rroceana@gmail.com'
-app.config['MAIL_PASSWORD'] = 'curmzyawtlapqcyn'
-app.config['MAIL_DEFAULT_SENDER'] = ('FinanSmart', 'rroceana@gmail.com')
+app.config['MAIL_USERNAME'] = os.environ.get('MAIL_USERNAME', 'rroceana@gmail.com')
+app.config['MAIL_PASSWORD'] = os.environ.get('MAIL_PASSWORD', 'curmzyawtlapqcyn')
+app.config['MAIL_DEFAULT_SENDER'] = ('FinanSmart', os.environ.get('MAIL_USERNAME', 'rroceana@gmail.com'))
+
+app.secret_key = os.environ.get('SECRET_KEY', 'finansmart_secret_key')
 
 mysql = MySQL(app)
 def cek_mahasiswa():
